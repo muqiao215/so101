@@ -1,0 +1,36 @@
+{
+  "schema": "so101_light_follower_serial_config.v1",
+  "port": "/dev/ttyACM0",
+  "dry_run": true,
+  "backend": "native_posix",
+  "robot_id": "so101_follower_wsl",
+  "calibration_file": "config/follower_calibration.json",
+  "baudrate": 1000000,
+  "read_timeout_ms": 80,
+  "write_timeout_ms": 80,
+  "max_relative_target_deg": 2.0,
+  "command_step_delay_sec": 0.8,
+  "http_host": "127.0.0.1",
+  "http_port": 8765,
+  "mapping": {
+    "profile": "so101_follower_model_v1",
+    "position_scales": {
+      "shoulder_pan": 1.0,
+      "shoulder_lift": -1.0,
+      "elbow_flex": 1.0,
+      "wrist_flex": 1.0,
+      "wrist_roll": -1.0,
+      "gripper": 1.0
+    },
+    "position_offsets_deg": {
+      "shoulder_pan": 0.0,
+      "shoulder_lift": 0.0,
+      "elbow_flex": 0.0,
+      "wrist_flex": 0.0,
+      "wrist_roll": 0.0,
+      "gripper": 0.0
+    },
+    "gripper_scale": 100.0,
+    "gripper_offset": 0.0
+  }
+}

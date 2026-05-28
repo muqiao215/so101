@@ -1,0 +1,51 @@
+{
+  "schema": "so101_teleop_calibration.v1",
+  "calibrated": false,
+  "created_ms": 0,
+  "leader_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00",
+  "follower_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3E089429-if00",
+  "leader_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "follower_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "joint_names": [
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper"
+  ],
+  "leader_raw": {},
+  "follower_raw": {},
+  "by_joint": {},
+  "teleop_gains": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "teleop_invert": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "notes": "Put leader and follower into the same physical pose, then use the UI button to save calibration. Commit this file to migrate the teleop alignment."
+}

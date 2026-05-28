@@ -1,0 +1,86 @@
+{
+  "schema": "so101_light_follower_serial_config.v1",
+  "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3E089429-if00",
+  "leader_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00",
+  "leader_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "teleop_frequency_hz": 20.0,
+  "teleop_max_step_raw": 24.0,
+  "teleop_max_delta_raw": [
+    480,
+    480,
+    480,
+    480,
+    480,
+    360
+  ],
+  "teleop_gains": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "teleop_invert": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "dry_run": false,
+  "monitor_mode": false,
+  "backend": "native_posix",
+  "robot_id": "so101_follower_wsl",
+  "calibration_file": "config/follower_calibration.json",
+  "baudrate": 1000000,
+  "read_timeout_ms": 150,
+  "write_timeout_ms": 150,
+  "serial_settle_sec": 0.8,
+  "scan_window_sec": 20.0,
+  "scan_retries": 6,
+  "scan_retry_delay_sec": 0.3,
+  "max_relative_target_deg": 2.0,
+  "command_step_delay_sec": 0.8,
+  "safe_point_positions": [
+    -0.0629085708411143,
+    1.8619402613583462,
+    1.7031344788691918,
+    -1.779852248187624,
+    -0.13425609630725613,
+    0.012239020878329733
+  ],
+  "safe_point_steps": 12,
+  "safe_point_step_delay_sec": 0.25,
+  "http_host": "127.0.0.1",
+  "http_port": 8765,
+  "mapping": {
+    "profile": "so101_follower_model_v1",
+    "position_scales": {
+      "shoulder_pan": 1.0,
+      "shoulder_lift": -1.0,
+      "elbow_flex": 1.0,
+      "wrist_flex": 1.0,
+      "wrist_roll": -1.0,
+      "gripper": 1.0
+    },
+    "position_offsets_deg": {
+      "shoulder_pan": 0.0,
+      "shoulder_lift": 0.0,
+      "elbow_flex": 0.0,
+      "wrist_flex": 0.0,
+      "wrist_roll": 0.0,
+      "gripper": 0.0
+    },
+    "gripper_scale": 100.0,
+    "gripper_offset": 0.0
+  }
+}

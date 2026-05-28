@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>SO101 Win7 Follower Demo</title>
+  <link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <p class="eyebrow">SO101 Follower Cell</p>
+          <h1>从臂六轴控制台</h1>
+          <p class="hero-copy">连接硬件、采集姿态、录制动作并回放。所有会影响真实机械臂的操作都只在动作模式下开放。</p>
+        </div>
+        <div class="hero-status">
+          <span id="modeBadge" class="hardware-badge unknown">LOADING...</span>
+          <span id="hardwareBadge" class="hardware-badge unknown">Hardware: checking...</span>
+          <span id="executionBadge" class="hardware-badge unknown">IDLE</span>
+        </div>
+      </div>
+      <div id="workflowBar" class="workflow-bar"></div>
+      <div class="actions">
+        <button id="connectBtn">连接硬件</button>
+        <button id="monitorModeBtn" class="secondary">监视模式</button>
+        <button id="actionModeBtn" class="secondary">动作模式</button>
+        <button id="refreshBtn" class="secondary">刷新状态</button>
+        <button id="stopBtn" class="danger">停止执行并释放力矩</button>
+      </div>
+      <p class="hero-footnote">停止会请求当前动作中断并释放力矩，不是物理急停；等待状态变为空闲后再开始新动作。</p>
+    </section>
+
+    <section class="panel">
+      <h2>实时关节位置 <span id="jointTimestamp"></span></h2>
+      <div id="jointGrid" class="joint-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>时间段动作录制 <span id="recordHint"></span></h2>
+      <div class="record-grid">
+        <label>动作名称 <input id="recordNameInput" type="text" value="" placeholder="例如 inspection_sweep"></label>
+        <label>采样间隔(ms) <input id="recordIntervalInput" type="number" min="80" max="3000" step="10" value="250"></label>
+        <div id="recordCount" class="record-count">0 samples</div>
+      </div>
+      <div class="manual-actions">
+        <button id="recordStartBtn">开始录制</button>
+        <button id="recordStopBtn" class="secondary">停止录制</button>
+        <button id="recordSaveBtn" class="secondary">保存为动作</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>录制回放 <span id="playbackHint"></span></h2>
+      <div class="playback-grid">
+        <label>录制文件/模板 <select id="recordingSelect"></select></label>
+        <label>播放次数 <input id="repeatCountInput" type="number" min="1" max="20" step="1" value="1"></label>
+        <div id="recordingMeta" class="record-count">no recording</div>
+      </div>
+      <div class="manual-actions">
+        <button id="recordingRefreshBtn" class="secondary">刷新录制列表</button>
+        <button id="recordingRenameBtn" class="secondary">重命名所选</button>
+        <button id="recordingDeleteBtn" class="danger">删除所选</button>
+        <button id="recordingHomeBtn" class="secondary">回安全点</button>
+        <button id="recordingPauseBtn" class="secondary">暂停</button>
+        <button id="recordingResumeBtn" class="secondary">继续</button>
+        <button id="recordingPlayBtn">回放录制</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>主从遥操作 <span id="teleopHint"></span></h2>
+      <div class="teleop-grid">
+        <label>主臂串口 <input id="leaderPortInput" type="text" value="/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00"></label>
+        <label>主臂 ID <input id="leaderIdsInput" type="text" value="1,2,3,4,5,6"></label>
+        <label>频率(Hz) <input id="teleopFreqInput" type="number" min="5" max="50" step="1" value="20"></label>
+        <label>单步限速(raw) <input id="teleopStepInput" type="number" min="2" max="120" step="1" value="24"></label>
+        <div id="teleopMeta" class="record-count">未启动</div>
+      </div>
+      <div class="manual-actions">
+        <button id="teleopScanBtn" class="secondary">扫描主臂</button>
+        <button id="teleopCalibrateBtn" class="secondary">同步当前位置为校准</button>
+        <button id="teleopStartBtn">开始跟随</button>
+        <button id="teleopPauseBtn" class="secondary">暂停跟随</button>
+        <button id="teleopResumeBtn" class="secondary">继续跟随</button>
+        <button id="teleopStopBtn" class="danger">停止跟随</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <h2>录制动作库</h2>
+        <div id="templateButtons" class="template-grid"></div>
+      </article>
+
+      <article class="panel">
+        <h2>运行状态</h2>
+        <dl class="status-grid" id="compactStatusGrid"></dl>
+      </article>
+    </section>
+
+    <section class="panel status-panel">
+      <h2>当前状态</h2>
+      <dl id="statusGrid" class="status-grid status-grid-compact"></dl>
+    </section>
+
+    <section class="panel">
+      <h2>最后一次 Action</h2>
+      <pre id="lastAction">{}</pre>
+    </section>
+
+    <section class="panel">
+      <h2>事件</h2>
+      <div id="events" class="events"></div>
+    </section>
+
+    <section class="panel">
+      <h2>六轴手动控制 <span id="manualModeHint"></span></h2>
+      <div id="manualControls" class="axis-controls"></div>
+      <div class="manual-actions">
+        <button id="manualSendBtn">发送六轴目标</button>
+        <button id="manualHomeBtn" class="secondary">写入 Home</button>
+        <button id="manualSyncBtn" class="secondary">同步当前读数</button>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js?v=22"></script>
+</body>
+</html>

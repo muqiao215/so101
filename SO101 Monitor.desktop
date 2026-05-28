@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SO101 Console
+Comment=SO101 机械臂监视/动作控制台
+Exec=/home/muqiao/桌面/dev/so101_win7_follower_demo_20260521-094227/start.sh
+Icon=preferences-desktop-remote-desktop
+Terminal=true
+Categories=Development;
+StartupNotify=true
