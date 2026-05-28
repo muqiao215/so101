@@ -37,6 +37,8 @@ CONFIG_DIR = os.path.join(ROOT, "config")
 RECORDINGS_DIR = os.path.join(CONFIG_DIR, "recordings")
 RECORDINGS_TRASH_DIR = os.path.join(RECORDINGS_DIR, ".trash")
 TELEOP_CALIBRATION_PATH = os.path.join(CONFIG_DIR, "teleop_calibration.json")
+LEADER_CALIBRATION_PATH = os.path.join(CONFIG_DIR, "leader_calibration.json")
+FOLLOWER_CALIBRATION_PATH = os.path.join(CONFIG_DIR, "follower_calibration.json")
 STATIC_DIR = os.path.join(ROOT, "static")
 LOG_DIR = os.path.join(ROOT, "logs")
 JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
@@ -121,11 +123,89 @@ def parse_float_list(value, count, default_value):
 
 def load_teleop_calibration():
     if not os.path.exists(TELEOP_CALIBRATION_PATH):
-        return {"schema": "so101_teleop_calibration.v1", "calibrated": False}
+        return default_midpoint_teleop_calibration()
     payload = read_json(TELEOP_CALIBRATION_PATH)
     payload.setdefault("schema", "so101_teleop_calibration.v1")
     payload.setdefault("calibrated", False)
+    if not bool(payload.get("calibrated")):
+        generated = default_midpoint_teleop_calibration()
+        if bool(generated.get("calibrated")):
+            write_json(TELEOP_CALIBRATION_PATH, generated)
+            return generated
     return payload
+
+
+def default_midpoint_teleop_calibration():
+    if not os.path.exists(LEADER_CALIBRATION_PATH) or not os.path.exists(FOLLOWER_CALIBRATION_PATH):
+        return {"schema": "so101_teleop_calibration.v1", "calibrated": False}
+    leader_calibration = read_json(LEADER_CALIBRATION_PATH)
+    follower_calibration = read_json(FOLLOWER_CALIBRATION_PATH)
+    serial_config = read_json(os.path.join(CONFIG_DIR, "serial_config.json"))
+    midpoint = int(STS_MAX_RESOLUTION / 2)
+    leader_ids = [int(leader_calibration[name]["id"]) for name in JOINT_NAMES]
+    follower_ids = [int(follower_calibration[name]["id"]) for name in JOINT_NAMES]
+    leader_raw = dict((str(motor_id), midpoint) for motor_id in leader_ids)
+    follower_raw = dict((str(motor_id), midpoint) for motor_id in follower_ids)
+    by_joint = {}
+    for index, name in enumerate(JOINT_NAMES):
+        leader_id = leader_ids[index]
+        follower_id = follower_ids[index]
+        by_joint[name] = {
+            "leader_id": leader_id,
+            "follower_id": follower_id,
+            "leader_raw": midpoint,
+            "follower_raw": midpoint,
+            "offset_raw": 0,
+        }
+    return {
+        "schema": "so101_teleop_calibration.v1",
+        "calibrated": True,
+        "created_ms": now_ms(),
+        "source": "motor_midpoint_calibration",
+        "leader_port": serial_config.get("leader_port", ""),
+        "follower_port": serial_config.get("port", ""),
+        "leader_ids": leader_ids,
+        "follower_ids": follower_ids,
+        "joint_names": list(JOINT_NAMES),
+        "leader_raw": leader_raw,
+        "follower_raw": follower_raw,
+        "by_joint": by_joint,
+        "teleop_gains": parse_float_list(serial_config.get("teleop_gains"), len(JOINT_NAMES), 1.0),
+        "teleop_invert": parse_float_list(serial_config.get("teleop_invert"), len(JOINT_NAMES), 1.0),
+        "notes": "Generated from official motor calibration midpoint. LeRobot set_half_turn_homings maps the calibrated middle pose to raw 2047.",
+    }
+
+
+def calibration_by_id(calibration):
+    result = {}
+    for name in JOINT_NAMES:
+        cal = dict(calibration[name])
+        cal["name"] = name
+        result[int(cal["id"])] = cal
+    return result
+
+
+def calibrated_relative_ratio(raw, center, cal):
+    raw = float(raw)
+    center = float(center)
+    range_min = float(cal["range_min"])
+    range_max = float(cal["range_max"])
+    if raw >= center:
+        span = max(1.0, range_max - center)
+    else:
+        span = max(1.0, center - range_min)
+    return (raw - center) / span
+
+
+def calibrated_raw_from_ratio(ratio, center, cal):
+    center = float(center)
+    range_min = float(cal["range_min"])
+    range_max = float(cal["range_max"])
+    if ratio >= 0:
+        span = max(1.0, range_max - center)
+    else:
+        span = max(1.0, center - range_min)
+    return int(round(clamp(center + ratio * span, range_min, range_max)))
 
 
 def normalize_raw_by_id(payload):
@@ -216,6 +296,11 @@ def raw_present_to_manual_positions(observation, calibration, mapping):
             control_deg = (action_deg - float(offsets.get(name, 0.0))) / scale
             positions.append(math.radians(control_deg))
     return positions
+
+
+def raw_goal_to_manual_positions(goal_by_id, calibration, mapping):
+    observation = {"present_positions": dict((str(k), int(v)) for k, v in (goal_by_id or {}).items())}
+    return raw_present_to_manual_positions(observation, calibration, mapping)
 
 
 def decode_signed_15bit(value):
@@ -552,6 +637,9 @@ class RawTeleopSession(object):
     def __init__(self, serial_config, calibration):
         self.serial_config = serial_config
         self.calibration = calibration
+        self.leader_calibration = read_json(LEADER_CALIBRATION_PATH) if os.path.exists(LEADER_CALIBRATION_PATH) else {}
+        self.leader_calibration_by_id = calibration_by_id(self.leader_calibration) if self.leader_calibration else {}
+        self.follower_calibration_by_id = calibration_by_id(self.calibration)
         self.teleop_calibration = load_teleop_calibration()
         self.leader_bus = None
         self.follower_driver = None
@@ -567,6 +655,9 @@ class RawTeleopSession(object):
         self.last_goal_raw = {}
         self.last_step_ms = 0
         self.frames = 0
+        self.recorded_points = []
+        self.recording_interval = 0.25
+        self._last_record_sample_ts = 0.0
 
     def _joint_count(self):
         return len(JOINT_NAMES)
@@ -694,6 +785,9 @@ class RawTeleopSession(object):
             self.pause_event.clear()
             self.last_error = ""
             self.frames = 0
+            self.recorded_points = []
+            self.recording_interval = clamp(float(options.get("recording_delay", 0.25)), 0.05, 3.0)
+            self._last_record_sample_ts = 0.0
             self.follower_driver = follower_driver
             self.thread = threading.Thread(target=self._run, args=(options,), daemon=True)
             self.running = True
@@ -723,7 +817,7 @@ class RawTeleopSession(object):
         if thread is not None and thread.is_alive():
             thread.join(2.0)
         with self.lock:
-            return {"ok": True, "teleop": self.status()}
+            return {"ok": True, "teleop": self.status(), "recorded_points": list(self.recorded_points), "recording_delay": self.recording_interval}
 
     def _run(self, options):
         leader_ids = parse_int_list(options.get("leader_ids", self.serial_config.get("leader_ids")), self._leader_ids())
@@ -788,14 +882,28 @@ class RawTeleopSession(object):
                 goal = {}
                 for index, follower_id in enumerate(follower_ids):
                     leader_id = leader_ids[index]
-                    leader_delta = int(leader_now[leader_id]) - int(leader_start[leader_id])
-                    bounded_delta = clamp(leader_delta * gains[index] * invert[index], -max_delta[index], max_delta[index])
-                    wanted = int(round(int(follower_start[follower_id]) + bounded_delta))
+                    leader_cal = self.leader_calibration_by_id.get(int(leader_id))
+                    follower_cal = self.follower_calibration_by_id.get(int(follower_id))
+                    if leader_cal and follower_cal:
+                        ratio = calibrated_relative_ratio(leader_now[leader_id], leader_start[leader_id], leader_cal)
+                        bounded_ratio = clamp(ratio * gains[index] * invert[index], -1.0, 1.0)
+                        wanted = calibrated_raw_from_ratio(bounded_ratio, follower_start[follower_id], follower_cal)
+                    else:
+                        leader_delta = int(leader_now[leader_id]) - int(leader_start[leader_id])
+                        bounded_delta = clamp(leader_delta * gains[index] * invert[index], -max_delta[index], max_delta[index])
+                        wanted = int(round(int(follower_start[follower_id]) + bounded_delta))
                     previous = int(current_goal[follower_id])
                     step = clamp(wanted - previous, -max_step_raw, max_step_raw)
                     goal[follower_id] = int(round(previous + step))
                 self.follower_driver.bus.sync_write_word(STS_ADDR_GOAL_POSITION, goal)
                 current_goal = dict(goal)
+                now = time.time()
+                if now - self._last_record_sample_ts >= self.recording_interval:
+                    point = raw_goal_to_manual_positions(current_goal, self.calibration, self.serial_config.get("mapping", {}))
+                    if point is not None:
+                        with self.lock:
+                            self.recorded_points.append(point)
+                        self._last_record_sample_ts = now
                 try:
                     follower_now = self.follower_driver.bus.read_present_positions(follower_ids)
                 except Exception:
@@ -1314,6 +1422,26 @@ class DemoRuntime(object):
             self._log("teleop_calibrated", payload)
         return {"ok": True, "calibration": payload, "file": TELEOP_CALIBRATION_PATH}
 
+    def prepare_teleop_calibration(self):
+        with self.lock:
+            if self.state.get("monitor_mode"):
+                raise RuntimeError("手动重设对齐只能在动作模式下进行")
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能手动重设对齐")
+            if not (self.state.get("connected") and getattr(self.driver, "connected", False)):
+                raise RuntimeError("请先连接从臂")
+            if hasattr(self.driver, "release_torque"):
+                self.driver.release_torque()
+            self.state["control_initialized"] = False
+            self.state["control_init_source"] = ""
+            self.state["last_error"] = ""
+            self._log("teleop_calibration_prepare", {"torque_released": True})
+            return {
+                "ok": True,
+                "message": "已释放从臂力矩。请手动把主臂和从臂摆成同一姿态，然后再次点击“保存当前位置对齐”。",
+                "torque_released": True,
+            }
+
     def start_teleop(self, body):
         with self.lock:
             if self.state.get("monitor_mode"):
@@ -1358,11 +1486,26 @@ class DemoRuntime(object):
 
     def stop_teleop(self):
         result = self.teleop.stop()
+        points = result.get("recorded_points") or []
+        delay = result.get("recording_delay", 0.25)
+        saved_recording = None
+        save_error = ""
+        if len(points) >= 2:
+            try:
+                saved_recording = self._save_recording_unlocked("teleop_%s" % time.strftime("%Y%m%d_%H%M%S"), points, delay)
+            except Exception as exc:
+                save_error = "%s: %s" % (type(exc).__name__, exc)
         with self.lock:
             self.state["busy"] = False
             self.state["execution_state"] = "idle"
             if result.get("teleop", {}).get("last_error"):
                 self.state["last_error"] = result["teleop"]["last_error"]
+            if save_error:
+                self.state["last_error"] = "主从录制保存失败: %s" % save_error
+            result["saved_recording"] = saved_recording
+            result["recorded_samples"] = len(points)
+            if save_error:
+                result["recording_error"] = save_error
             self._log("teleop_stop_requested", result)
         return result
 
@@ -1776,6 +1919,9 @@ class DemoRuntime(object):
         with self.lock:
             if self.state.get("busy"):
                 raise RuntimeError("执行中不能保存动作")
+        return self._save_recording_unlocked(name, points, delay)
+
+    def _save_recording_unlocked(self, name, points, delay):
         if not isinstance(points, list) or len(points) < 2:
             raise ValueError("recording requires at least 2 samples")
         normalized_points = [normalize_manual_positions(point) for point in points]
@@ -2246,6 +2392,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(RUNTIME.read_observation())
             elif path == "/api/teleop/scan":
                 self._send_json(RUNTIME.scan_leader(body.get("leader_port", ""), body.get("leader_ids", [])))
+            elif path == "/api/teleop/prepare-calibration":
+                self._send_json(RUNTIME.prepare_teleop_calibration())
             elif path == "/api/teleop/calibrate":
                 self._send_json(RUNTIME.calibrate_teleop(body))
             elif path == "/api/teleop/start":

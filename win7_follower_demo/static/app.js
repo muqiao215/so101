@@ -72,6 +72,7 @@
   var recordedPoints = [];
   var recordings = [];
   var pendingRecordingSelection = '';
+  var teleopAlignmentArmed = false;
 
   function addEvent(type, text) {
     var item = document.createElement('div');
@@ -514,13 +515,17 @@
     var paused = !!teleop.paused || executionState === 'paused';
     var canUseTeleop = connected && !monitor;
     var calibrated = !!(teleop.calibration && teleop.calibration.calibrated);
+    var calibrationSource = (teleop.calibration && teleop.calibration.source) || '';
+    var midpointCalibrated = calibrated && calibrationSource === 'motor_midpoint_calibration';
     if (teleopHint) {
       if (monitor) {
         teleopHint.textContent = '主从遥操作只在动作模式下开放。';
       } else if (!connected) {
         teleopHint.textContent = '先连接从臂，再扫描主臂。';
       } else if (!calibrated) {
-        teleopHint.textContent = '先把两臂摆成同一姿态，再点击“同步当前位置为校准”。';
+        teleopHint.textContent = '未读取到主从校准文件，请检查主臂和从臂校准 JSON。';
+      } else if (midpointCalibrated) {
+        teleopHint.textContent = '已使用主臂/从臂中位校准，可以开始跟随；先小幅移动确认方向。';
       } else {
         teleopHint.textContent = '已保存主从校准，可以开始跟随；先小幅移动确认方向。';
       }
@@ -528,6 +533,8 @@
     if (teleopMeta) {
       if (running) {
         teleopMeta.textContent = (paused ? '已暂停' : '跟随中') + ' / ' + (teleop.frames || 0) + ' frames';
+      } else if (midpointCalibrated) {
+        teleopMeta.textContent = '已校准 / 中位校准 / ' + new Date(Number(teleop.calibration.created_ms || 0)).toLocaleString();
       } else if (calibrated) {
         teleopMeta.textContent = '已校准 / ' + new Date(Number(teleop.calibration.created_ms || 0)).toLocaleString();
       } else if (teleop.last_error) {
@@ -541,7 +548,10 @@
     if (teleopFreqInput) teleopFreqInput.disabled = running;
     if (teleopStepInput) teleopStepInput.disabled = running;
     if (teleopScanBtn) teleopScanBtn.disabled = busy || !canUseTeleop;
-    if (teleopCalibrateBtn) teleopCalibrateBtn.disabled = busy || !canUseTeleop;
+    if (teleopCalibrateBtn) {
+      teleopCalibrateBtn.disabled = busy || !canUseTeleop;
+      teleopCalibrateBtn.textContent = teleopAlignmentArmed ? '保存当前位置对齐' : '手动重设对齐';
+    }
     if (teleopStartBtn) teleopStartBtn.disabled = busy || !canUseTeleop || !calibrated;
     if (teleopPauseBtn) teleopPauseBtn.disabled = !running || paused;
     if (teleopResumeBtn) teleopResumeBtn.disabled = !running || !paused;
@@ -550,6 +560,7 @@
 
   function setMode(mode) {
     addEvent('info', '\u5207\u6362\u6A21\u5F0F: ' + mode);
+    teleopAlignmentArmed = false;
     stopRecording(false);
     api('POST', '/api/mode', { mode: mode }).then(function (res) {
       if (!res) return;
@@ -794,7 +805,24 @@
       addEvent('error', '先切到动作模式并连接从臂。');
       return;
     }
-    if (!window.confirm('确认同步当前位置为主从校准？\n请先把主臂和从臂摆到你认为一致的物理姿态。')) {
+    if (!teleopAlignmentArmed) {
+      if (!window.confirm('准备手动重设主从对齐？\n系统会先释放从臂力矩，然后你手动把主臂和从臂摆成同一姿态。摆好后再点“保存当前位置对齐”。')) {
+        return;
+      }
+      addEvent('warn', '正在释放从臂力矩，准备手动摆臂对齐...');
+      api('POST', '/api/teleop/prepare-calibration', {}, 10000).then(function (res) {
+        if (!res) return;
+        if (res.ok) {
+          teleopAlignmentArmed = true;
+          addEvent('ok', '从臂力矩已释放。现在手动摆成同一姿态，然后点击“保存当前位置对齐”。');
+        } else {
+          addEvent('error', '释放力矩失败: ' + (res.error || 'unknown'));
+        }
+        refreshStatus();
+      });
+      return;
+    }
+    if (!window.confirm('确认保存当前主臂和从臂姿态为新的主从对齐？')) {
       return;
     }
     var payload = teleopPayload();
@@ -802,6 +830,7 @@
     api('POST', '/api/teleop/calibrate', payload, 30000).then(function (res) {
       if (!res) return;
       if (res.ok) {
+        teleopAlignmentArmed = false;
         addEvent('ok', '主从校准已保存: ' + (res.file || 'config/teleop_calibration.json'));
       } else {
         addEvent('error', '主从校准失败: ' + (res.error || 'unknown'));
@@ -815,6 +844,7 @@
       addEvent('error', '先切到动作模式并连接从臂。');
       return;
     }
+    teleopAlignmentArmed = false;
     var payload = teleopPayload();
     addEvent('warn', '开始主从跟随：使用已保存校准，先小幅移动主臂确认方向。');
     api('POST', '/api/teleop/start', payload, 30000).then(function (res) {
@@ -849,8 +879,18 @@
   function stopTeleop() {
     api('POST', '/api/teleop/stop').then(function (res) {
       if (!res) return;
-      if (res.ok) addEvent('warn', '主从跟随已停止');
-      else addEvent('error', '停止跟随失败: ' + (res.error || 'unknown'));
+      if (res.ok) {
+        addEvent('warn', '主从跟随已停止');
+        if (res.saved_recording && res.saved_recording.file) {
+          pendingRecordingSelection = 'file:' + res.saved_recording.file;
+          addEvent('ok', '主从轨迹已保存: ' + res.saved_recording.file + ' (' + (res.saved_recording.samples || res.recorded_samples || 0) + ' 帧)');
+          refreshRecordingsAndTemplates();
+        } else if (res.recorded_samples) {
+          addEvent('warn', '主从轨迹未保存: ' + (res.recording_error || '录制帧数不足'));
+        }
+      } else {
+        addEvent('error', '停止跟随失败: ' + (res.error || 'unknown'));
+      }
       refreshStatus();
     });
   }

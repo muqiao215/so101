@@ -1,7 +1,7 @@
 {
   "schema": "so101_teleop_calibration.v1",
-  "calibrated": false,
-  "created_ms": 0,
+  "calibrated": true,
+  "created_ms": 1779955948428,
   "leader_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00",
   "follower_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3E089429-if00",
   "leader_ids": [
@@ -28,9 +28,66 @@
     "wrist_roll",
     "gripper"
   ],
-  "leader_raw": {},
-  "follower_raw": {},
-  "by_joint": {},
+  "leader_raw": {
+    "1": 1965,
+    "2": 831,
+    "3": 3095,
+    "4": 1778,
+    "5": 4034,
+    "6": 2082
+  },
+  "follower_raw": {
+    "1": 2145,
+    "2": 900,
+    "3": 3042,
+    "4": 750,
+    "5": 3893,
+    "6": 1624
+  },
+  "by_joint": {
+    "shoulder_pan": {
+      "leader_id": 1,
+      "follower_id": 1,
+      "leader_raw": 1965,
+      "follower_raw": 2145,
+      "offset_raw": 180
+    },
+    "shoulder_lift": {
+      "leader_id": 2,
+      "follower_id": 2,
+      "leader_raw": 831,
+      "follower_raw": 900,
+      "offset_raw": 69
+    },
+    "elbow_flex": {
+      "leader_id": 3,
+      "follower_id": 3,
+      "leader_raw": 3095,
+      "follower_raw": 3042,
+      "offset_raw": -53
+    },
+    "wrist_flex": {
+      "leader_id": 4,
+      "follower_id": 4,
+      "leader_raw": 1778,
+      "follower_raw": 750,
+      "offset_raw": -1028
+    },
+    "wrist_roll": {
+      "leader_id": 5,
+      "follower_id": 5,
+      "leader_raw": 4034,
+      "follower_raw": 3893,
+      "offset_raw": -141
+    },
+    "gripper": {
+      "leader_id": 6,
+      "follower_id": 6,
+      "leader_raw": 2082,
+      "follower_raw": 1624,
+      "offset_raw": -458
+    }
+  },
   "teleop_gains": [
     1.0,
     1.0,
@@ -47,5 +104,5 @@
     1.0,
     1.0
   ],
-  "notes": "Put leader and follower into the same physical pose, then use the UI button to save calibration. Commit this file to migrate the teleop alignment."
+  "notes": "Put leader and follower into the same physical pose, then save this file. It is intended to be committed and migrated with the project."
 }
