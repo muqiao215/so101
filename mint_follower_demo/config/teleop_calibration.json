@@ -1,7 +1,7 @@
 {
   "schema": "so101_teleop_calibration.v1",
   "calibrated": true,
-  "created_ms": 1779955948428,
+  "created_ms": 1782176589079,
   "leader_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00",
   "follower_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3E089429-if00",
   "leader_ids": [
@@ -29,63 +29,63 @@
     "gripper"
   ],
   "leader_raw": {
-    "1": 1965,
-    "2": 831,
-    "3": 3095,
-    "4": 1778,
-    "5": 4034,
-    "6": 2082
+    "1": 1942,
+    "2": 838,
+    "3": 3096,
+    "4": 2683,
+    "5": 2106,
+    "6": 2047
   },
   "follower_raw": {
-    "1": 2145,
-    "2": 900,
-    "3": 3042,
-    "4": 750,
-    "5": 3893,
-    "6": 1624
+    "1": 2069,
+    "2": 916,
+    "3": 3085,
+    "4": 728,
+    "5": 1985,
+    "6": 588
   },
   "by_joint": {
     "shoulder_pan": {
       "leader_id": 1,
       "follower_id": 1,
-      "leader_raw": 1965,
-      "follower_raw": 2145,
-      "offset_raw": 180
+      "leader_raw": 1942,
+      "follower_raw": 2069,
+      "offset_raw": 127
     },
     "shoulder_lift": {
       "leader_id": 2,
       "follower_id": 2,
-      "leader_raw": 831,
-      "follower_raw": 900,
-      "offset_raw": 69
+      "leader_raw": 838,
+      "follower_raw": 916,
+      "offset_raw": 78
     },
     "elbow_flex": {
       "leader_id": 3,
       "follower_id": 3,
-      "leader_raw": 3095,
-      "follower_raw": 3042,
-      "offset_raw": -53
+      "leader_raw": 3096,
+      "follower_raw": 3085,
+      "offset_raw": -11
     },
     "wrist_flex": {
       "leader_id": 4,
       "follower_id": 4,
-      "leader_raw": 1778,
-      "follower_raw": 750,
-      "offset_raw": -1028
+      "leader_raw": 2683,
+      "follower_raw": 728,
+      "offset_raw": -1955
     },
     "wrist_roll": {
       "leader_id": 5,
       "follower_id": 5,
-      "leader_raw": 4034,
-      "follower_raw": 3893,
-      "offset_raw": -141
+      "leader_raw": 2106,
+      "follower_raw": 1985,
+      "offset_raw": -121
     },
     "gripper": {
       "leader_id": 6,
       "follower_id": 6,
-      "leader_raw": 2082,
-      "follower_raw": 1624,
-      "offset_raw": -458
+      "leader_raw": 2047,
+      "follower_raw": 588,
+      "offset_raw": -1459
     }
   },
   "teleop_gains": [

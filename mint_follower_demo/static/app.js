@@ -10,6 +10,16 @@
   var hardwareBadge = document.getElementById('hardwareBadge');
   var modeBadge = document.getElementById('modeBadge');
   var executionBadge = document.getElementById('executionBadge');
+  var operatorBadge = document.getElementById('operatorBadge');
+  var loginGate = document.getElementById('loginGate');
+  var loginAdminTab = document.getElementById('loginAdminTab');
+  var loginEmployeeTab = document.getElementById('loginEmployeeTab');
+  var loginNameInput = document.getElementById('loginNameInput');
+  var loginEnterBtn = document.getElementById('loginEnterBtn');
+  var loginRecordsPanel = document.getElementById('loginRecordsPanel');
+  var loginRecordsList = document.getElementById('loginRecordsList');
+  var loginRecordsRefreshBtn = document.getElementById('loginRecordsRefreshBtn');
+  var loginRecordsClearBtn = document.getElementById('loginRecordsClearBtn');
   var connectBtn = document.getElementById('connectBtn');
   var jointGrid = document.getElementById('jointGrid');
   var jointTimestamp = document.getElementById('jointTimestamp');
@@ -47,10 +57,27 @@
   var teleopMeta = document.getElementById('teleopMeta');
   var teleopScanBtn = document.getElementById('teleopScanBtn');
   var teleopCalibrateBtn = document.getElementById('teleopCalibrateBtn');
+  var gripperCalArmSelect = document.getElementById('gripperCalArmSelect');
+  var followerGripperMinBtn = document.getElementById('followerGripperMinBtn');
+  var followerGripperCloseTestBtn = document.getElementById('followerGripperCloseTestBtn');
+  var teleopHealthBtn = document.getElementById('teleopHealthBtn');
   var teleopStartBtn = document.getElementById('teleopStartBtn');
   var teleopPauseBtn = document.getElementById('teleopPauseBtn');
   var teleopResumeBtn = document.getElementById('teleopResumeBtn');
   var teleopStopBtn = document.getElementById('teleopStopBtn');
+  var productActionSelect = document.getElementById('productActionSelect');
+  var productActionRepeatInput = document.getElementById('productActionRepeatInput');
+  var productActionMeta = document.getElementById('productActionMeta');
+  var productActionRefreshBtn = document.getElementById('productActionRefreshBtn');
+  var productActionRunBtn = document.getElementById('productActionRunBtn');
+  var productActionAdminPanel = document.getElementById('productActionAdminPanel');
+  var productActionNameInput = document.getElementById('productActionNameInput');
+  var productActionSourceSelect = document.getElementById('productActionSourceSelect');
+  var productActionStatusSelect = document.getElementById('productActionStatusSelect');
+  var productActionNoteInput = document.getElementById('productActionNoteInput');
+  var productActionSaveBtn = document.getElementById('productActionSaveBtn');
+  var productActionAdminList = document.getElementById('productActionAdminList');
+  var businessRunLogList = document.getElementById('businessRunLogList');
 
   var JOINT_NAMES = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
   var JOINT_LABELS = ['\u5E95\u5EA7', '\u80A9\u90E8', '\u8098\u90E8', '\u8155\u4FEF\u4EF0', '\u8155\u65CB\u8F6C', '\u5939\u722A'];
@@ -72,7 +99,15 @@
   var recordedPoints = [];
   var recordings = [];
   var pendingRecordingSelection = '';
+  var pendingSavePayload = null;
   var teleopAlignmentArmed = false;
+  var followerGripperMinArmed = false;
+  var gripperMinCalibrationArm = 'follower';
+  var loginRole = 'admin';
+  var loginSession = null;
+  var productActions = [];
+  var businessRunLog = [];
+  var editingProductActionId = '';
 
   function addEvent(type, text) {
     var item = document.createElement('div');
@@ -130,6 +165,75 @@
 
   function normalizeDisplayName(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function setLoginRole(role) {
+    loginRole = role === 'employee' ? 'employee' : 'admin';
+    if (loginAdminTab) loginAdminTab.className = loginRole === 'admin' ? 'active' : 'secondary';
+    if (loginEmployeeTab) loginEmployeeTab.className = loginRole === 'employee' ? 'active' : 'secondary';
+    if (loginNameInput) {
+      loginNameInput.placeholder = loginRole === 'admin' ? '例如 admin' : '例如 employee_01';
+    }
+  }
+
+  function updateOperatorUi() {
+    var roleLabel = loginSession && loginSession.role === 'employee' ? '员工' : '管理员';
+    var name = loginSession ? loginSession.operator : '未登录';
+    if (operatorBadge) {
+      operatorBadge.className = 'hardware-badge ' + (loginSession ? 'connected' : 'unknown');
+      operatorBadge.textContent = loginSession ? (roleLabel + ': ' + name) : '未登录';
+    }
+    if (loginRecordsPanel) {
+      loginRecordsPanel.className = 'panel admin-panel' + (loginSession && loginSession.role === 'admin' ? '' : ' hidden');
+    }
+    if (productActionAdminPanel) {
+      productActionAdminPanel.className = 'panel admin-panel' + (loginSession && loginSession.role === 'admin' ? '' : ' hidden');
+    }
+    if (loginSession && loginSession.role === 'admin') {
+      loadLoginRecords();
+    }
+  }
+
+  function renderLoginRecords(records) {
+    if (!loginRecordsList) return;
+    records = records || [];
+    if (!records.length) {
+      loginRecordsList.innerHTML = '<div class="template-empty">暂无登录记录</div>';
+      return;
+    }
+    loginRecordsList.innerHTML = records.map(function (rec) {
+      var role = rec.role === 'employee' ? '员工' : '管理员';
+      return '<div class="login-record">' +
+        '<span>' + escapeHtml(rec.time || '-') + '</span>' +
+        '<span class="role">' + escapeHtml(role) + '</span>' +
+        '<span>' + escapeHtml(rec.operator || '-') + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function loadLoginRecords() {
+    return api('GET', '/api/login-records').then(function (res) {
+      if (!res || !res.ok) return;
+      renderLoginRecords(res.records || []);
+    });
+  }
+
+  function submitLogin() {
+    var operatorName = normalizeDisplayName(loginNameInput && loginNameInput.value);
+    api('POST', '/api/login', {
+      role: loginRole,
+      operator: operatorName
+    }).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        loginSession = res.session || { role: loginRole, operator: operatorName || (loginRole === 'admin' ? '管理员' : '员工') };
+        if (loginGate) loginGate.className = 'login-gate hidden';
+        updateOperatorUi();
+        addEvent('ok', '已登录: ' + (loginSession.role === 'employee' ? '员工 ' : '管理员 ') + loginSession.operator);
+      } else {
+        addEvent('error', '登录失败: ' + (res.error || 'unknown'));
+      }
+    });
   }
 
   function parseIds(value) {
@@ -205,6 +309,14 @@
     return !!(manualInitialized && lastStatus.control_initialized);
   }
 
+  function canPlayRecording() {
+    if (!lastStatus) return false;
+    if (lastStatus.monitor_mode) return false;
+    if (lastStatus.busy) return false;
+    if (lastStatus.dry_run) return true;
+    return !!lastStatus.connected;
+  }
+
   function countObservationAxes(obs) {
     var count = 0;
     for (var i = 0; i < JOINT_NAMES.length; i++) {
@@ -261,6 +373,272 @@
     var repeat = clamp(parseInt((repeatCountInput && repeatCountInput.value) || '1', 10) || 1, 1, 20);
     if (repeatCountInput) repeatCountInput.value = repeat;
     return repeat;
+  }
+
+  function getProductActionRepeatCount() {
+    var repeat = clamp(parseInt((productActionRepeatInput && productActionRepeatInput.value) || '1', 10) || 1, 1, 20);
+    if (productActionRepeatInput) productActionRepeatInput.value = repeat;
+    return repeat;
+  }
+
+  function currentOperatorName() {
+    return loginSession ? loginSession.operator : '';
+  }
+
+  function productActionStatusLabel(status) {
+    if (status === 'released') return '已发布';
+    if (status === 'disabled') return '停用';
+    return '草稿';
+  }
+
+  function productActionSourceRecords() {
+    var records = recordings.filter(function (rec) {
+      return rec.kind === 'template' && templates[rec.id];
+    });
+    var known = {};
+    for (var i = 0; i < records.length; i++) {
+      known[records[i].id] = true;
+    }
+    Object.keys(templates).filter(function (name) {
+      return name.indexOf('record_') === 0 && !known[name];
+    }).forEach(function (name) {
+      records.push({
+        kind: 'template',
+        id: name,
+        name: name,
+        display_name: name,
+        samples: (templates[name] || []).length
+      });
+    });
+    records.sort(function (a, b) {
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+    return records;
+  }
+
+  function productActionById(id) {
+    for (var i = 0; i < productActions.length; i++) {
+      if (String(productActions[i].id || '') === String(id || '')) return productActions[i];
+    }
+    return null;
+  }
+
+  function selectedProductAction() {
+    if (!productActionSelect) return null;
+    return productActionById(productActionSelect.value);
+  }
+
+  function updateProductActionMeta() {
+    if (!productActionMeta) return;
+    var action = selectedProductAction();
+    if (!action) {
+      productActionMeta.textContent = '未选择产品动作';
+      return;
+    }
+    var parts = [
+      productActionStatusLabel(action.status),
+      action.source_template || '-',
+      action.updated_at || '-'
+    ];
+    productActionMeta.textContent = parts.join(' / ');
+  }
+
+  function updateProductActionAvailability() {
+    var action = selectedProductAction();
+    var busy = !!(lastStatus && lastStatus.busy);
+    if (productActionRunBtn) productActionRunBtn.disabled = busy || !action || !canPlayRecording();
+    if (productActionRefreshBtn) productActionRefreshBtn.disabled = busy;
+    if (productActionSaveBtn) productActionSaveBtn.disabled = busy;
+  }
+
+  function renderProductActionSourceOptions() {
+    if (!productActionSourceSelect) return;
+    var records = productActionSourceRecords();
+    if (!records.length) {
+      productActionSourceSelect.innerHTML = '<option value="">暂无可发布录制</option>';
+      return;
+    }
+    var selected = productActionSourceSelect.value || '';
+    productActionSourceSelect.innerHTML = records.map(function (rec) {
+      var label = (rec.display_name || rec.name || rec.id) + ' (' + rec.samples + ' 帧)';
+      return '<option value="' + escapeHtml(rec.id) + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+    if (selected) {
+      for (var i = 0; i < productActionSourceSelect.options.length; i++) {
+        if (productActionSourceSelect.options[i].value === selected) {
+          productActionSourceSelect.value = selected;
+          break;
+        }
+      }
+    }
+  }
+
+  function renderBusinessRunLog() {
+    if (!businessRunLogList) return;
+    var rows = businessRunLog.slice(0, 30);
+    if (!rows.length) {
+      businessRunLogList.innerHTML = '<div class="template-empty">暂无业务执行记录</div>';
+      return;
+    }
+    businessRunLogList.innerHTML = rows.map(function (row) {
+      var result = row.result === 'ok' ? '成功' : (row.result === 'stopped' ? '停止' : '失败');
+      var cls = row.result === 'ok' ? 'released' : (row.result === 'stopped' ? 'draft' : 'disabled');
+      return '<div class="business-run-row">' +
+        '<span>' + escapeHtml(row.time || '-') + '</span>' +
+        '<span>' + escapeHtml(row.operator || '-') + '</span>' +
+        '<strong>' + escapeHtml(row.action_name || row.action_id || '-') + '</strong>' +
+        '<span>' + escapeHtml('x ' + (row.repeat || 1)) + '</span>' +
+        '<span class="status-pill ' + cls + '">' + escapeHtml(result) + '</span>' +
+        '<span>' + escapeHtml(row.error || '') + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function renderProductActions() {
+    renderProductActionSourceOptions();
+    if (productActionSelect) {
+      var released = productActions.filter(function (action) {
+        return action.status === 'released';
+      });
+      var selected = productActionSelect.value || '';
+      if (!released.length) {
+        productActionSelect.innerHTML = '<option value="">暂无已发布产品动作</option>';
+      } else {
+        productActionSelect.innerHTML = released.map(function (action) {
+          var label = (action.name || action.id) + ' / ' + (action.source_template || '-');
+          return '<option value="' + escapeHtml(action.id) + '">' + escapeHtml(label) + '</option>';
+        }).join('');
+        var stillExists = false;
+        for (var i = 0; i < productActionSelect.options.length; i++) {
+          if (productActionSelect.options[i].value === selected) {
+            stillExists = true;
+            break;
+          }
+        }
+        if (stillExists) productActionSelect.value = selected;
+      }
+      updateProductActionMeta();
+    }
+    if (productActionAdminList) {
+      if (!productActions.length) {
+        productActionAdminList.innerHTML = '<div class="template-empty">暂无产品动作。先录制并保存动作，再在这里发布。</div>';
+      } else {
+        productActionAdminList.innerHTML = productActions.map(function (action) {
+          var status = action.status || 'draft';
+          return '<div class="product-action-card">' +
+            '<div class="product-action-main">' +
+              '<strong>' + escapeHtml(action.name || action.id) + '</strong>' +
+              '<span class="status-pill ' + escapeHtml(status) + '">' + escapeHtml(productActionStatusLabel(status)) + '</span>' +
+              '<span>来源: ' + escapeHtml(action.source_template || '-') + '</span>' +
+              '<span>更新: ' + escapeHtml(action.updated_by || '-') + ' / ' + escapeHtml(action.updated_at || '-') + '</span>' +
+              '<small>' + escapeHtml(action.note || '') + '</small>' +
+            '</div>' +
+            '<div class="product-action-actions">' +
+              '<button class="secondary" data-product-fill="' + escapeHtml(action.id) + '">填入</button>' +
+              '<button class="secondary" data-product-test="' + escapeHtml(action.source_template || '') + '">试运行</button>' +
+              '<button data-product-status="released" data-product-id="' + escapeHtml(action.id) + '">发布</button>' +
+              '<button class="secondary" data-product-status="draft" data-product-id="' + escapeHtml(action.id) + '">草稿</button>' +
+              '<button class="danger" data-product-status="disabled" data-product-id="' + escapeHtml(action.id) + '">停用</button>' +
+            '</div>' +
+            '</div>';
+        }).join('');
+      }
+    }
+    renderBusinessRunLog();
+    updateProductActionAvailability();
+  }
+
+  function loadProductActions() {
+    return api('GET', '/api/product-actions').then(function (res) {
+      if (!res || !res.ok) return;
+      productActions = res.actions || [];
+      businessRunLog = res.run_log || [];
+      renderProductActions();
+    });
+  }
+
+  function fillProductActionForm(action) {
+    if (!action) return;
+    editingProductActionId = action.id || '';
+    if (productActionNameInput) productActionNameInput.value = action.name || '';
+    if (productActionStatusSelect) productActionStatusSelect.value = action.status || 'draft';
+    if (productActionNoteInput) productActionNoteInput.value = action.note || '';
+    renderProductActionSourceOptions();
+    if (productActionSourceSelect && action.source_template) productActionSourceSelect.value = action.source_template;
+  }
+
+  function saveProductAction() {
+    var name = normalizeDisplayName(productActionNameInput && productActionNameInput.value);
+    var template = (productActionSourceSelect && productActionSourceSelect.value) || '';
+    if (!name) {
+      addEvent('error', '产品动作名不能为空');
+      return;
+    }
+    if (!template) {
+      addEvent('error', '先选择一个已保存录制作为来源');
+      return;
+    }
+    api('POST', '/api/product-action/save', {
+      id: editingProductActionId,
+      name: name,
+      template: template,
+      status: (productActionStatusSelect && productActionStatusSelect.value) || 'draft',
+      note: normalizeDisplayName(productActionNoteInput && productActionNoteInput.value),
+      operator: currentOperatorName()
+    }).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        editingProductActionId = '';
+        addEvent('ok', '产品动作已保存: ' + (res.action && res.action.name ? res.action.name : name));
+        loadProductActions();
+      } else {
+        addEvent('error', '保存产品动作失败: ' + (res.error || 'unknown'));
+      }
+    });
+  }
+
+  function changeProductActionStatus(id, status) {
+    api('POST', '/api/product-action/status', {
+      id: id,
+      status: status,
+      operator: currentOperatorName()
+    }).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        addEvent('ok', '产品动作状态已更新: ' + productActionStatusLabel(status));
+        loadProductActions();
+      } else {
+        addEvent('error', '状态更新失败: ' + (res.error || 'unknown'));
+      }
+    });
+  }
+
+  function runProductAction(id) {
+    var action = productActionById(id);
+    if (!action) {
+      addEvent('error', '先选择一个产品动作');
+      return;
+    }
+    if (!canPlayRecording()) {
+      addEvent('error', '产品动作需要动作模式、已连接从臂，且当前没有其他动作');
+      return;
+    }
+    var repeat = getProductActionRepeatCount();
+    addEvent('info', '执行产品动作: ' + (action.name || action.id) + ' x ' + repeat);
+    api('POST', '/api/product-action/run', {
+      id: action.id,
+      repeat: repeat,
+      operator: currentOperatorName()
+    }).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        addEvent('ok', '产品动作已执行: ' + (action.name || action.id));
+      } else {
+        addEvent('error', '产品动作执行失败: ' + (res.error || 'unknown'));
+      }
+      refreshStatus();
+      loadProductActions();
+    });
   }
 
   function setManualValue(index, displayValue) {
@@ -438,7 +816,7 @@
     if (manualHomeBtn) {
       manualHomeBtn.disabled = monitor || busy || (liveNeedsInit && !ready);
     }
-    updateTemplateButtonsDisabled(monitor || busy || (liveNeedsInit && !ready));
+    updateTemplateButtonsDisabled(monitor || busy || !canPlayRecording());
     if (recordNameInput) {
       recordNameInput.disabled = recording || busy;
     }
@@ -478,7 +856,7 @@
     var teleop = (lastStatus && lastStatus.teleop) || {};
     var teleopRunning = !!teleop.running;
     var paused = executionState === 'paused';
-    var canPlay = canRunMotion() && !!selectedRecording();
+    var canPlay = canPlayRecording() && !!selectedRecording();
     if (recordHint) {
       if (!monitor) {
         recordHint.textContent = '\u5F55\u5236\u53EA\u5728\u76D1\u89C6\u6A21\u5F0F\u5F00\u653E\uFF1B\u52A8\u4F5C\u6A21\u5F0F\u7528\u4E8E\u56DE\u653E\u548C\u516D\u8F74\u53D1\u9001\u3002';
@@ -492,9 +870,9 @@
     if (recordStopBtn) recordStopBtn.disabled = !recording;
     if (recordSaveBtn) recordSaveBtn.disabled = busy || !monitor || recording || recordedPoints.length < 2;
     if (playbackHint) {
-      playbackHint.textContent = canRunMotion()
+      playbackHint.textContent = canPlayRecording()
         ? '\u9009\u62E9\u5DF2\u4FDD\u5B58\u7684\u5F55\u5236\u6A21\u677F\u6216\u6587\u4EF6\u8FDB\u884C\u56DE\u653E\u3002'
-        : '\u56DE\u653E\u9700\u8981\u52A8\u4F5C\u6A21\u5F0F\uFF0C\u5E76\u5148\u6309\u5F53\u524D\u5B9E\u673A\u4F4D\u7F6E\u521D\u59CB\u5316\u3002';
+        : '\u56DE\u653E\u9700\u8981\u52A8\u4F5C\u6A21\u5F0F\u3001\u5DF2\u8FDE\u63A5\u4ECE\u81C2\uFF0C\u4E14\u5F53\u524D\u6CA1\u6709\u5176\u4ED6\u52A8\u4F5C\u3002';
     }
     if (recordingRefreshBtn) recordingRefreshBtn.disabled = busy;
     if (recordingDeleteBtn) recordingDeleteBtn.disabled = busy || !selectedRecording();
@@ -532,7 +910,11 @@
     }
     if (teleopMeta) {
       if (running) {
-        teleopMeta.textContent = (paused ? '已暂停' : '跟随中') + ' / ' + (teleop.frames || 0) + ' frames';
+        var gripperDebug = teleop.last_gripper_debug || {};
+        var gripperText = gripperDebug.goal_raw !== undefined
+          ? (' / G 主 ' + gripperDebug.leader_now_raw + ' 从始 ' + gripperDebug.follower_start_raw + ' 实 ' + gripperDebug.follower_present_raw + ' 目 ' + gripperDebug.goal_raw + (gripperDebug.hold_active ? ' 保持' : ''))
+          : '';
+        teleopMeta.textContent = (paused ? '已暂停' : '跟随中') + ' / ' + (teleop.frames || 0) + ' frames' + gripperText;
       } else if (midpointCalibrated) {
         teleopMeta.textContent = '已校准 / 中位校准 / ' + new Date(Number(teleop.calibration.created_ms || 0)).toLocaleString();
       } else if (calibrated) {
@@ -552,6 +934,13 @@
       teleopCalibrateBtn.disabled = busy || !canUseTeleop;
       teleopCalibrateBtn.textContent = teleopAlignmentArmed ? '保存当前位置对齐' : '手动重设对齐';
     }
+    if (followerGripperMinBtn) {
+      followerGripperMinBtn.disabled = busy || !canUseTeleop;
+      followerGripperMinBtn.textContent = followerGripperMinArmed ? '保存夹爪闭合端' : '夹爪闭合端';
+    }
+    if (gripperCalArmSelect) gripperCalArmSelect.disabled = busy || followerGripperMinArmed;
+    if (followerGripperCloseTestBtn) followerGripperCloseTestBtn.disabled = busy || !canUseTeleop;
+    if (teleopHealthBtn) teleopHealthBtn.disabled = busy;
     if (teleopStartBtn) teleopStartBtn.disabled = busy || !canUseTeleop || !calibrated;
     if (teleopPauseBtn) teleopPauseBtn.disabled = !running || paused;
     if (teleopResumeBtn) teleopResumeBtn.disabled = !running || !paused;
@@ -561,6 +950,7 @@
   function setMode(mode) {
     addEvent('info', '\u5207\u6362\u6A21\u5F0F: ' + mode);
     teleopAlignmentArmed = false;
+    followerGripperMinArmed = false;
     stopRecording(false);
     api('POST', '/api/mode', { mode: mode }).then(function (res) {
       if (!res) return;
@@ -630,11 +1020,21 @@
       clearInterval(recordTimer);
       recordTimer = null;
     }
-    if (recording && showEvent !== false) {
-      addEvent('warn', '\u5DF2\u505C\u6B62\u5F55\u5236\uFF0C\u5171 ' + recordedPoints.length + ' \u5E27');
-    }
+    var wasRecording = recording;
     recording = false;
     updateRecordingAvailability();
+    if (showEvent === false) return;
+    if (wasRecording) {
+      addEvent('warn', '\u5DF2\u505C\u6B62\u5F55\u5236\uFF0C\u5171 ' + recordedPoints.length + ' \u5E27');
+    }
+    if (recordedPoints.length >= 2) {
+      var intervalMs = clamp(Number(recordIntervalInput.value || 250), 80, 3000);
+      promptSaveRecording(recordedPoints, intervalMs / 1000.0, recordedPoints.length);
+    } else if (recordedPoints.length > 0) {
+      addEvent('warn', '\u5F55\u5236\u53EA\u6709 ' + recordedPoints.length + ' \u5E27\uFF0C\u5C11\u4E8E 2 \u5E27\uFF0C\u5DF2\u81EA\u52A8\u4E22\u5F03');
+      recordedPoints = [];
+      updateRecordCount();
+    }
   }
 
   function saveRecording() {
@@ -702,6 +1102,7 @@
       }
       updateRecordingMeta();
       renderTemplateLibrary();
+      renderProductActions();
       updateRecordingAvailability();
     });
   }
@@ -730,8 +1131,8 @@
   }
 
   function playSelectedRecording() {
-    if (!canRunMotion()) {
-      addEvent('error', '\u56DE\u653E\u524D\u9700\u8981\u5207\u5230\u52A8\u4F5C\u6A21\u5F0F\u5E76\u5B8C\u6210\u521D\u59CB\u5316');
+    if (!canPlayRecording()) {
+      addEvent('error', '\u56DE\u653E\u9700\u8981\u52A8\u4F5C\u6A21\u5F0F\u3001\u5DF2\u8FDE\u63A5\u4ECE\u81C2\uFF0C\u4E14\u5F53\u524D\u6CA1\u6709\u5176\u4ED6\u52A8\u4F5C');
       return;
     }
     loadSelectedRecordingFile(function (templateName) {
@@ -786,6 +1187,10 @@
     };
   }
 
+  function selectedGripperCalibrationArm() {
+    return gripperCalArmSelect && gripperCalArmSelect.value === 'leader' ? 'leader' : 'follower';
+  }
+
   function scanLeaderArm() {
     var payload = teleopPayload();
     addEvent('info', '正在扫描主臂: ' + payload.leader_port);
@@ -800,11 +1205,39 @@
     });
   }
 
+  function showCalibrationHealth(health, sourceLabel) {
+    if (!health) {
+      addEvent('warn', '校准体检：未返回结果。');
+      return;
+    }
+    if (health.ok) {
+      addEvent('ok', '校准体检（' + (sourceLabel || '') + '）：' + (health.summary || '正常'));
+      return;
+    }
+    addEvent('error', '校准体检（' + (sourceLabel || '') + '）：' + (health.summary || '发现问题'));
+    var warnings = health.warnings || [];
+    for (var i = 0; i < warnings.length; i++) {
+      addEvent('warn', '  · ' + warnings[i].message);
+    }
+  }
+
+  function checkSavedCalibration() {
+    api('GET', '/api/teleop/calibration-health').then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        showCalibrationHealth(res.health, '当前已保存校准');
+      } else {
+        addEvent('error', '校准体检失败: ' + (res.error || 'unknown'));
+      }
+    });
+  }
+
   function calibrateTeleop() {
     if (!lastStatus || lastStatus.monitor_mode || !lastStatus.connected) {
       addEvent('error', '先切到动作模式并连接从臂。');
       return;
     }
+    followerGripperMinArmed = false;
     if (!teleopAlignmentArmed) {
       if (!window.confirm('准备手动重设主从对齐？\n系统会先释放从臂力矩，然后你手动把主臂和从臂摆成同一姿态。摆好后再点“保存当前位置对齐”。')) {
         return;
@@ -832,8 +1265,91 @@
       if (res.ok) {
         teleopAlignmentArmed = false;
         addEvent('ok', '主从校准已保存: ' + (res.file || 'config/teleop_calibration.json'));
+        showCalibrationHealth(res.calibration && res.calibration.health, '新保存的校准');
       } else {
         addEvent('error', '主从校准失败: ' + (res.error || 'unknown'));
+      }
+      refreshStatus();
+    });
+  }
+
+  function calibrateFollowerGripperMin() {
+    if (!lastStatus || lastStatus.monitor_mode || !lastStatus.connected) {
+      addEvent('error', '先切到动作模式并连接从臂。');
+      return;
+    }
+    teleopAlignmentArmed = false;
+    if (!followerGripperMinArmed) {
+      gripperMinCalibrationArm = selectedGripperCalibrationArm();
+      var armLabel = gripperMinCalibrationArm === 'leader' ? '主臂' : '从臂';
+      if (!window.confirm('准备校准' + armLabel + '夹爪闭合端？\n系统只释放' + armLabel + '夹爪力矩。释放后，请手动把' + armLabel + '夹爪推到完全闭合端，再点“保存夹爪闭合端”。')) {
+        return;
+      }
+      var preparePayload = teleopPayload();
+      preparePayload.arm = gripperMinCalibrationArm;
+      addEvent('warn', '正在释放' + armLabel + '夹爪力矩...');
+      api('POST', '/api/gripper/prepare-min', preparePayload, 10000).then(function (res) {
+        if (!res) return;
+        if (res.ok) {
+          followerGripperMinArmed = true;
+          addEvent('ok', armLabel + '夹爪力矩已释放。请手动推到闭合端，然后点击“保存夹爪闭合端”。');
+        } else {
+          addEvent('error', '释放夹爪失败: ' + (res.error || 'unknown'));
+        }
+        updateTeleopAvailability();
+        refreshStatus();
+      });
+      return;
+    }
+    var saveArmLabel = gripperMinCalibrationArm === 'leader' ? '主臂' : '从臂';
+    if (!window.confirm('确认把当前' + saveArmLabel + '夹爪位置保存为闭合端 range_min？\n保存前会自动备份对应校准文件。')) {
+      return;
+    }
+    var savePayload = teleopPayload();
+    savePayload.arm = gripperMinCalibrationArm;
+    addEvent('warn', '正在保存' + saveArmLabel + '夹爪闭合端...');
+    api('POST', '/api/gripper/save-min', savePayload, 10000).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        followerGripperMinArmed = false;
+        addEvent('ok', saveArmLabel + '夹爪闭合端已保存: ' + res.old_range_min + ' -> ' + res.new_range_min);
+        loadTemplates();
+      } else {
+        addEvent('error', '保存夹爪闭合端失败: ' + (res.error || 'unknown'));
+      }
+      updateTeleopAvailability();
+      refreshStatus();
+    });
+  }
+
+  function testFollowerGripperClose() {
+    if (!lastStatus || lastStatus.monitor_mode || !lastStatus.connected) {
+      addEvent('error', '先切到动作模式并连接从臂。');
+      return;
+    }
+    if (!window.confirm('直接测试从臂夹爪闭合？\n系统会连续 3 秒向 ID 6 发送闭合端 raw，不经过动作模板。')) {
+      return;
+    }
+    addEvent('warn', '正在直接测试从臂夹爪闭合...');
+    api('POST', '/api/follower-gripper/close-test', { duration: 3.0 }, 10000).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        var diff = Math.abs(Number(res.final_raw) - Number(res.target_raw));
+        var type = diff <= 80 ? 'ok' : 'error';
+        var sync = res.limit_sync || {};
+        var before = sync.before || {};
+        var after = sync.after || {};
+        var limitText = '';
+        if (before.min_angle_limit !== undefined || after.min_angle_limit !== undefined) {
+          limitText = ' / limit ' +
+            (before.min_angle_limit !== undefined ? before.min_angle_limit : '-') + '-' +
+            (before.max_angle_limit !== undefined ? before.max_angle_limit : '-') + ' -> ' +
+            (after.min_angle_limit !== undefined ? after.min_angle_limit : '-') + '-' +
+            (after.max_angle_limit !== undefined ? after.max_angle_limit : '-');
+        }
+        addEvent(type, '夹爪闭合测试: start=' + res.start_raw + ' target=' + res.target_raw + ' final=' + res.final_raw + ' error=' + res.error_raw + limitText);
+      } else {
+        addEvent('error', '夹爪闭合测试失败: ' + (res.error || 'unknown'));
       }
       refreshStatus();
     });
@@ -845,6 +1361,7 @@
       return;
     }
     teleopAlignmentArmed = false;
+    followerGripperMinArmed = false;
     var payload = teleopPayload();
     addEvent('warn', '开始主从跟随：使用已保存校准，先小幅移动主臂确认方向。');
     api('POST', '/api/teleop/start', payload, 30000).then(function (res) {
@@ -881,18 +1398,97 @@
       if (!res) return;
       if (res.ok) {
         addEvent('warn', '主从跟随已停止');
-        if (res.saved_recording && res.saved_recording.file) {
-          pendingRecordingSelection = 'file:' + res.saved_recording.file;
-          addEvent('ok', '主从轨迹已保存: ' + res.saved_recording.file + ' (' + (res.saved_recording.samples || res.recorded_samples || 0) + ' 帧)');
-          refreshRecordingsAndTemplates();
-        } else if (res.recorded_samples) {
-          addEvent('warn', '主从轨迹未保存: ' + (res.recording_error || '录制帧数不足'));
+        var samples = res.recorded_samples || 0;
+        var points = res.recorded_points || [];
+        var delay = res.recorded_delay || 0.25;
+        if (samples >= 2 && points.length >= 2) {
+          promptSaveRecording(points, delay, samples);
+        } else if (samples > 0) {
+          addEvent('warn', '主从录制只有 ' + samples + ' 帧，少于 2 帧，已自动丢弃');
         }
       } else {
         addEvent('error', '停止跟随失败: ' + (res.error || 'unknown'));
       }
       refreshStatus();
     });
+  }
+
+  function promptSaveRecording(points, delay, samples) {
+    var dialog = document.getElementById('savePromptDialog');
+    var meta = document.getElementById('savePromptMeta');
+    var nameInput = document.getElementById('savePromptName');
+    if (!dialog || !meta || !nameInput) {
+      addEvent('warn', '录制了 ' + samples + ' 帧（' + (delay * samples).toFixed(1) + ' 秒）但保存对话框不可用');
+      return;
+    }
+    var defaultName = 'teleop_' + formatTimestamp(new Date());
+    meta.textContent = '本次主从跟随录制了 ' + samples + ' 帧，间隔 ' + (delay * 1000).toFixed(0) + 'ms，总时长约 ' + (delay * samples).toFixed(1) + ' 秒';
+    nameInput.value = defaultName;
+    pendingSavePayload = { points: points, delay: delay, samples: samples };
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+      setTimeout(function () { nameInput.focus(); nameInput.select(); }, 30);
+    } else {
+      addEvent('warn', '当前浏览器不支持 <dialog>，请改用 Chrome / Edge');
+    }
+  }
+
+  function commitSaveRecording() {
+    var dialog = document.getElementById('savePromptDialog');
+    var nameInput = document.getElementById('savePromptName');
+    if (!pendingSavePayload) {
+      if (dialog) dialog.close();
+      return;
+    }
+    var requestedName = normalizeRecordingName(nameInput && nameInput.value) || '';
+    var payload = pendingSavePayload;
+    pendingSavePayload = null;
+    if (dialog) dialog.close();
+    addEvent('warn', '正在保存录制: ' + (requestedName || '默认时间戳名'));
+    api('POST', '/api/recording/save', {
+      name: requestedName,
+      delay: payload.delay,
+      points: payload.points
+    }).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        pendingRecordingSelection = res.file ? 'file:' + res.file : 'template:' + res.template;
+        addEvent('ok', '已保存录制: ' + res.template + ' / 文件: ' + (res.file || '-') + ' (' + res.samples + ' 帧)');
+        if (recordedPoints === payload.points || (payload.points && recordedPoints.length === payload.points.length)) {
+          recordedPoints = [];
+          updateRecordCount();
+        }
+        if (recordNameInput && res.template) {
+          recordNameInput.value = res.template;
+        }
+        refreshRecordingsAndTemplates();
+      } else {
+        addEvent('error', '保存失败: ' + (res.error || 'unknown'));
+      }
+    });
+  }
+
+  function discardSaveRecording() {
+    var dialog = document.getElementById('savePromptDialog');
+    var payload = pendingSavePayload;
+    pendingSavePayload = null;
+    if (payload && recordedPoints === payload.points) {
+      recordedPoints = [];
+      updateRecordCount();
+    }
+    addEvent('warn', '已丢弃本次录制（' + (payload ? payload.samples : 0) + ' 帧）');
+    if (dialog) dialog.close();
+  }
+
+  function cancelSaveRecording() {
+    var dialog = document.getElementById('savePromptDialog');
+    addEvent('warn', '已取消保存选择，' + (pendingSavePayload ? pendingSavePayload.samples : 0) + ' 帧暂存于本会话');
+    if (dialog) dialog.close();
+  }
+
+  function formatTimestamp(d) {
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
   }
 
   function deleteSelectedRecording() {
@@ -1008,6 +1604,7 @@
     renderWorkflow(status);
     updateMotionAvailability();
     updateRecordingAvailability();
+    updateProductActionAvailability();
     updateTeleopAvailability();
   }
 
@@ -1066,18 +1663,21 @@
       setManualPositions(manualState);
       updateMotionAvailability();
       updateRecordingAvailability();
+      renderProductActions();
     });
   }
 
   function refreshRecordingsAndTemplates(preferredValue) {
     return loadTemplates().then(function () {
       return loadRecordings(preferredValue);
+    }).then(function () {
+      return loadProductActions();
     });
   }
 
   function runTemplate(name) {
-    if (!canRunMotion()) {
-      addEvent('error', '\u5C1A\u672A\u6309\u5F53\u524D\u5B9E\u673A\u4F4D\u7F6E\u521D\u59CB\u5316\uFF0C\u4E0D\u5141\u8BB8\u8FD0\u884C\u6A21\u677F');
+    if (!canPlayRecording()) {
+      addEvent('error', '\u56DE\u653E\u9700\u8981\u52A8\u4F5C\u6A21\u5F0F\u3001\u5DF2\u8FDE\u63A5\u4ECE\u81C2\uFF0C\u4E14\u5F53\u524D\u6CA1\u6709\u5176\u4ED6\u52A8\u4F5C');
       return;
     }
     var repeat = getRepeatCount();
@@ -1141,6 +1741,39 @@
     }
     renameRecording(rec.kind, rec.id, rec.display_name || rec.name || rec.id);
   }
+
+  if (loginAdminTab) loginAdminTab.onclick = function () {
+    setLoginRole('admin');
+  };
+
+  if (loginEmployeeTab) loginEmployeeTab.onclick = function () {
+    setLoginRole('employee');
+  };
+
+  if (loginEnterBtn) loginEnterBtn.onclick = submitLogin;
+
+  if (loginNameInput) {
+    loginNameInput.onkeydown = function (event) {
+      if (event.key === 'Enter') {
+        submitLogin();
+      }
+    };
+  }
+
+  if (loginRecordsRefreshBtn) loginRecordsRefreshBtn.onclick = loadLoginRecords;
+
+  if (loginRecordsClearBtn) loginRecordsClearBtn.onclick = function () {
+    if (!window.confirm('清空所有登录记录？')) return;
+    api('POST', '/api/login-records/clear', {}).then(function (res) {
+      if (!res) return;
+      if (res.ok) {
+        renderLoginRecords([]);
+        addEvent('warn', '登录记录已清空');
+      } else {
+        addEvent('error', '清空登录记录失败: ' + (res.error || 'unknown'));
+      }
+    });
+  };
 
   connectBtn.onclick = function () {
     manualInitialized = false;
@@ -1252,15 +1885,60 @@
   if (recordingPauseBtn) recordingPauseBtn.onclick = pausePlayback;
   if (recordingResumeBtn) recordingResumeBtn.onclick = resumePlayback;
   recordingPlayBtn.onclick = playSelectedRecording;
+  if (productActionRefreshBtn) productActionRefreshBtn.onclick = loadProductActions;
+  if (productActionSelect) productActionSelect.onchange = updateProductActionMeta;
+  if (productActionRunBtn) productActionRunBtn.onclick = function () {
+    var action = selectedProductAction();
+    runProductAction(action && action.id);
+  };
+  if (productActionSaveBtn) productActionSaveBtn.onclick = saveProductAction;
+  if (productActionAdminList) {
+    productActionAdminList.onclick = function (event) {
+      var target = event.target;
+      if (!target) return;
+      var fillId = target.getAttribute('data-product-fill');
+      var testTemplate = target.getAttribute('data-product-test');
+      var status = target.getAttribute('data-product-status');
+      var id = target.getAttribute('data-product-id');
+      if (fillId) {
+        fillProductActionForm(productActionById(fillId));
+      } else if (testTemplate) {
+        runTemplate(testTemplate);
+      } else if (status && id) {
+        changeProductActionStatus(id, status);
+      }
+    };
+  }
   if (teleopScanBtn) teleopScanBtn.onclick = scanLeaderArm;
   if (teleopCalibrateBtn) teleopCalibrateBtn.onclick = calibrateTeleop;
+  if (followerGripperMinBtn) followerGripperMinBtn.onclick = calibrateFollowerGripperMin;
+  if (followerGripperCloseTestBtn) followerGripperCloseTestBtn.onclick = testFollowerGripperClose;
+  if (teleopHealthBtn) teleopHealthBtn.onclick = checkSavedCalibration;
   if (teleopStartBtn) teleopStartBtn.onclick = startTeleop;
   if (teleopPauseBtn) teleopPauseBtn.onclick = pauseTeleop;
   if (teleopResumeBtn) teleopResumeBtn.onclick = resumeTeleop;
   if (teleopStopBtn) teleopStopBtn.onclick = stopTeleop;
 
+  var savePromptDialog = document.getElementById('savePromptDialog');
+  var savePromptSaveBtn = document.getElementById('savePromptSaveBtn');
+  var savePromptDiscardBtn = document.getElementById('savePromptDiscardBtn');
+  var savePromptCancelBtn = document.getElementById('savePromptCancelBtn');
+  if (savePromptSaveBtn) savePromptSaveBtn.onclick = commitSaveRecording;
+  if (savePromptDiscardBtn) savePromptDiscardBtn.onclick = discardSaveRecording;
+  if (savePromptCancelBtn) savePromptCancelBtn.onclick = cancelSaveRecording;
+  if (savePromptDialog) {
+    savePromptDialog.addEventListener('cancel', function (ev) {
+      if (pendingSavePayload) {
+        ev.preventDefault();
+        cancelSaveRecording();
+      }
+    });
+  }
+
   refreshRecordingsAndTemplates().then(function () {
     refreshStatus();
   });
+  setLoginRole('admin');
+  updateOperatorUi();
   setInterval(refreshStatus, 3000);
 }());

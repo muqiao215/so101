@@ -1,4 +1,9 @@
 win7_follower_demo/logs/
+mint_follower_demo/logs/
 __pycache__/
 *.pyc
+*.bak_*
+.~lock.*
+release_packages/
 win7_follower_demo/config/recordings/.trash/
+mint_follower_demo/config/recordings/.trash/

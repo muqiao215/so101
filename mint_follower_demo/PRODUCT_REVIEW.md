@@ -1,4 +1,4 @@
-# SO101 Win7 Follower Demo 产品评审
+# SO101 Mint Follower Demo 产品评审
 
 ## 结论
 

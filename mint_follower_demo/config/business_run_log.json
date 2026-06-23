@@ -1,0 +1,62 @@
+[
+  {
+    "ts_ms": 1782175138016,
+    "time": "2026-06-23 08:38:58",
+    "duration_ms": 30964,
+    "operator": "管理员",
+    "action_id": "action_product_action",
+    "action_name": "左侧住区",
+    "source_template": "record_20260527_164641",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782175217019,
+    "time": "2026-06-23 08:40:17",
+    "duration_ms": 44908,
+    "operator": "管理员",
+    "action_id": "action_product_action",
+    "action_name": "右侧抓取",
+    "source_template": "record_20260527_093159",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782176243644,
+    "time": "2026-06-23 08:57:23",
+    "duration_ms": 44888,
+    "operator": "管理员",
+    "action_id": "action_product_action",
+    "action_name": "右侧抓取",
+    "source_template": "record_20260527_093159",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782178330113,
+    "time": "2026-06-23 09:32:10",
+    "duration_ms": 30953,
+    "operator": "管理员",
+    "action_id": "action_product_action",
+    "action_name": "左侧抓取",
+    "source_template": "record_20260527_164641",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782178442506,
+    "time": "2026-06-23 09:34:02",
+    "duration_ms": 17756,
+    "operator": "管理员",
+    "action_id": "action_product_action_899f2df7",
+    "action_name": "夹爪测试",
+    "source_template": "record_teleop_20260623_093305",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  }
+]

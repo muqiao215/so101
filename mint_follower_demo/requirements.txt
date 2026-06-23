@@ -1,3 +1,3 @@
 # Empty on purpose.
-# This Windows 7 fallback demo uses only the Python standard library by default.
+# This Linux Mint fallback demo uses only the Python standard library by default.
 # Real serial mode uses ctypes + Windows COM API, not pyserial.

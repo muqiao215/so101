@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Windows 7 compatible SO101 follower demo server.
+"""Linux Mint compatible SO101 follower demo server.
 
 This file intentionally avoids ROS2, Java, Node.js, and non-standard web
 frameworks. The default lightweight runtime uses only the Python standard
@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 import traceback
+import zlib
 
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -39,6 +40,9 @@ RECORDINGS_TRASH_DIR = os.path.join(RECORDINGS_DIR, ".trash")
 TELEOP_CALIBRATION_PATH = os.path.join(CONFIG_DIR, "teleop_calibration.json")
 LEADER_CALIBRATION_PATH = os.path.join(CONFIG_DIR, "leader_calibration.json")
 FOLLOWER_CALIBRATION_PATH = os.path.join(CONFIG_DIR, "follower_calibration.json")
+LOGIN_RECORDS_PATH = os.path.join(CONFIG_DIR, "login_records.json")
+PRODUCT_ACTIONS_PATH = os.path.join(CONFIG_DIR, "product_actions.json")
+BUSINESS_RUN_LOG_PATH = os.path.join(CONFIG_DIR, "business_run_log.json")
 STATIC_DIR = os.path.join(ROOT, "static")
 LOG_DIR = os.path.join(ROOT, "logs")
 JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
@@ -53,8 +57,12 @@ MANUAL_LIMITS = {
 STS_MODEL_NUMBER = 777
 STS_MAX_RESOLUTION = 4095
 STS_ADDR_MODEL_NUMBER = 3
+STS_ADDR_MIN_ANGLE_LIMIT = 9
+STS_ADDR_MAX_ANGLE_LIMIT = 11
 STS_ADDR_TORQUE_ENABLE = 40
 STS_ADDR_GOAL_POSITION = 42
+STS_ADDR_TORQUE_LIMIT = 48
+STS_ADDR_EEPROM_LOCK = 55
 STS_ADDR_PRESENT_POSITION = 56
 STS_INST_PING = 1
 STS_INST_READ = 2
@@ -76,11 +84,134 @@ def write_json(path, payload):
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
 
 
+def backup_file(path):
+    if not os.path.exists(path):
+        return ""
+    backup_path = "%s.bak_%s" % (path, time.strftime("%Y%m%d_%H%M%S"))
+    with open(path, "rb") as src:
+        data = src.read()
+    with open(backup_path, "wb") as dst:
+        dst.write(data)
+    return backup_path
+
+
 def write_jsonl(path, payload):
     if not os.path.isdir(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
     with open(path, "a") as f:
         f.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def load_login_records():
+    if not os.path.exists(LOGIN_RECORDS_PATH):
+        return []
+    try:
+        records = read_json(LOGIN_RECORDS_PATH)
+    except Exception:
+        return []
+    if not isinstance(records, list):
+        return []
+    return records[-2000:]
+
+
+def save_login_records(records):
+    write_json(LOGIN_RECORDS_PATH, list(records)[-2000:])
+
+
+def normalize_login_role(value):
+    role = str(value or "").strip().lower()
+    if role not in ("admin", "employee"):
+        raise ValueError("role must be admin or employee")
+    return role
+
+
+def normalize_operator_name(value, role):
+    name = re.sub(r"\s+", " ", str(value or "").strip())
+    if not name:
+        name = "管理员" if role == "admin" else "员工"
+    return name[:80]
+
+
+def append_login_record(role, operator_name, user_agent):
+    role = normalize_login_role(role)
+    operator_name = normalize_operator_name(operator_name, role)
+    records = load_login_records()
+    record = {
+        "id": "login_%s_%03d" % (time.strftime("%Y%m%d_%H%M%S"), len(records) % 1000),
+        "ts_ms": now_ms(),
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "role": role,
+        "operator": operator_name,
+        "user_agent": str(user_agent or "")[:200],
+    }
+    records.append(record)
+    save_login_records(records)
+    return record
+
+
+def load_product_actions_payload():
+    if not os.path.exists(PRODUCT_ACTIONS_PATH):
+        return {"schema": "so101_product_actions.v1", "actions": []}
+    try:
+        payload = read_json(PRODUCT_ACTIONS_PATH)
+    except Exception:
+        return {"schema": "so101_product_actions.v1", "actions": []}
+    if not isinstance(payload, dict):
+        return {"schema": "so101_product_actions.v1", "actions": []}
+    payload.setdefault("schema", "so101_product_actions.v1")
+    actions = payload.get("actions", [])
+    payload["actions"] = actions if isinstance(actions, list) else []
+    return payload
+
+
+def save_product_actions_payload(payload):
+    payload = dict(payload or {})
+    payload["schema"] = "so101_product_actions.v1"
+    payload["actions"] = list(payload.get("actions", []))
+    write_json(PRODUCT_ACTIONS_PATH, payload)
+
+
+def normalize_action_status(value):
+    status = str(value or "draft").strip().lower()
+    if status not in ("draft", "released", "disabled"):
+        raise ValueError("status must be draft, released, or disabled")
+    return status
+
+
+def normalize_product_action_name(value):
+    name = re.sub(r"\s+", " ", str(value or "").strip())
+    if not name:
+        raise ValueError("产品动作名称不能为空")
+    return name[:80]
+
+
+def product_action_id_from_name(name):
+    raw_name = str(name).strip()
+    safe = re.sub(r"[^A-Za-z0-9_]+", "_", raw_name.lower()).strip("_")
+    if not safe:
+        digest = "%08x" % (zlib.crc32(raw_name.encode("utf-8")) & 0xFFFFFFFF)
+        safe = "product_action_" + digest
+    if not safe.startswith("action_"):
+        safe = "action_" + safe
+    return safe[:80]
+
+
+def load_business_run_log():
+    if not os.path.exists(BUSINESS_RUN_LOG_PATH):
+        return []
+    try:
+        rows = read_json(BUSINESS_RUN_LOG_PATH)
+    except Exception:
+        return []
+    if not isinstance(rows, list):
+        return []
+    return rows[-2000:]
+
+
+def append_business_run_log(row):
+    rows = load_business_run_log()
+    rows.append(dict(row or {}))
+    write_json(BUSINESS_RUN_LOG_PATH, rows[-2000:])
 
 
 def clamp(value, low, high):
@@ -144,18 +275,26 @@ def default_midpoint_teleop_calibration():
     midpoint = int(STS_MAX_RESOLUTION / 2)
     leader_ids = [int(leader_calibration[name]["id"]) for name in JOINT_NAMES]
     follower_ids = [int(follower_calibration[name]["id"]) for name in JOINT_NAMES]
-    leader_raw = dict((str(motor_id), midpoint) for motor_id in leader_ids)
-    follower_raw = dict((str(motor_id), midpoint) for motor_id in follower_ids)
+    leader_raw = {}
+    follower_raw = {}
     by_joint = {}
     for index, name in enumerate(JOINT_NAMES):
         leader_id = leader_ids[index]
         follower_id = follower_ids[index]
+        if name == "gripper":
+            leader_mid = int((int(leader_calibration[name]["range_min"]) + int(leader_calibration[name]["range_max"])) / 2)
+            follower_mid = int((int(follower_calibration[name]["range_min"]) + int(follower_calibration[name]["range_max"])) / 2)
+        else:
+            leader_mid = midpoint
+            follower_mid = midpoint
+        leader_raw[str(leader_id)] = leader_mid
+        follower_raw[str(follower_id)] = follower_mid
         by_joint[name] = {
             "leader_id": leader_id,
             "follower_id": follower_id,
-            "leader_raw": midpoint,
-            "follower_raw": midpoint,
-            "offset_raw": 0,
+            "leader_raw": leader_mid,
+            "follower_raw": follower_mid,
+            "offset_raw": follower_mid - leader_mid,
         }
     return {
         "schema": "so101_teleop_calibration.v1",
@@ -183,6 +322,89 @@ def calibration_by_id(calibration):
         cal["name"] = name
         result[int(cal["id"])] = cal
     return result
+
+
+def calibration_health_check(payload, leader_calibration, follower_calibration, angle_threshold_deg=10.0, pct_threshold=10.0):
+    """Compare a teleop calibration against the per-arm calibrations and flag anything that
+    suggests the two arms were not in the same physical pose when saved.
+
+    Uses the same UI angle formula as the frontend: ((raw - mid) * 360 / 4095) for joints
+    and a 0-100% percentage for the gripper. Threshold defaults are tuned for visual
+    hand-alignment tolerance: joints beyond 10° or gripper beyond 10% almost always mean
+    the user did not actually put the two arms into the same pose.
+    """
+    warnings = []
+    if not isinstance(payload, dict):
+        return {"ok": True, "warnings": warnings, "summary": "校准数据为空"}
+    by_joint = payload.get("by_joint", {}) or {}
+    for name in JOINT_NAMES:
+        joint = by_joint.get(name)
+        if not joint:
+            continue
+        try:
+            leader_raw = int(joint.get("leader_raw"))
+            follower_raw = int(joint.get("follower_raw"))
+        except (TypeError, ValueError):
+            continue
+        leader_cal = (leader_calibration or {}).get(name) if leader_calibration else None
+        follower_cal = (follower_calibration or {}).get(name) if follower_calibration else None
+        if not leader_cal or not follower_cal:
+            continue
+        l_min = int(leader_cal["range_min"])
+        l_max = int(leader_cal["range_max"])
+        f_min = int(follower_cal["range_min"])
+        f_max = int(follower_cal["range_max"])
+        if leader_raw < l_min or leader_raw > l_max:
+            warnings.append({
+                "joint": name,
+                "code": "leader_out_of_range",
+                "raw": leader_raw,
+                "range_min": l_min,
+                "range_max": l_max,
+                "message": "%s 主臂读数 %d 超出有效范围 [%d, %d]" % (name, leader_raw, l_min, l_max),
+            })
+        if follower_raw < f_min or follower_raw > f_max:
+            warnings.append({
+                "joint": name,
+                "code": "follower_out_of_range",
+                "raw": follower_raw,
+                "range_min": f_min,
+                "range_max": f_max,
+                "message": "%s 从臂读数 %d 超出有效范围 [%d, %d]，重新摆位后再校准" % (name, follower_raw, f_min, f_max),
+            })
+        if name == "gripper":
+            l_pct = (leader_raw - l_min) / max(1, l_max - l_min) * 100.0
+            f_pct = (follower_raw - f_min) / max(1, f_max - f_min) * 100.0
+            diff = abs(l_pct - f_pct)
+            if diff > pct_threshold:
+                warnings.append({
+                    "joint": name,
+                    "code": "gripper_pct_mismatch",
+                    "leader_pct": round(l_pct, 1),
+                    "follower_pct": round(f_pct, 1),
+                    "diff_pct": round(diff, 1),
+                    "message": "%s 主从开合度相差 %.1f%% (主 %.1f%%, 从 %.1f%%)" % (name, diff, l_pct, f_pct),
+                })
+        else:
+            l_mid = (l_min + l_max) / 2.0
+            f_mid = (f_min + f_max) / 2.0
+            l_deg = (leader_raw - l_mid) * 360.0 / STS_MAX_RESOLUTION
+            f_deg = (follower_raw - f_mid) * 360.0 / STS_MAX_RESOLUTION
+            diff = abs(l_deg - f_deg)
+            if diff > angle_threshold_deg:
+                warnings.append({
+                    "joint": name,
+                    "code": "angle_mismatch",
+                    "leader_angle_deg": round(l_deg, 1),
+                    "follower_angle_deg": round(f_deg, 1),
+                    "diff_deg": round(diff, 1),
+                    "message": "%s 主从姿态相差 %.1f° (主 %+.1f°, 从 %+.1f°)，请重新把两臂摆成同一姿态再校准" % (name, diff, l_deg, f_deg),
+                })
+    if warnings:
+        summary = "发现 %d 个校准问题，主从姿态可能未对齐" % len(warnings)
+    else:
+        summary = "校准正常"
+    return {"ok": not warnings, "warnings": warnings, "summary": summary}
 
 
 def calibrated_relative_ratio(raw, center, cal):
@@ -301,6 +523,13 @@ def raw_present_to_manual_positions(observation, calibration, mapping):
 def raw_goal_to_manual_positions(goal_by_id, calibration, mapping):
     observation = {"present_positions": dict((str(k), int(v)) for k, v in (goal_by_id or {}).items())}
     return raw_present_to_manual_positions(observation, calibration, mapping)
+
+
+def observation_to_manual_positions(observation, calibration, mapping):
+    positions = (observation or {}).get("positions")
+    if isinstance(positions, list) and len(positions) == len(JOINT_NAMES):
+        return normalize_manual_positions(positions)
+    return raw_present_to_manual_positions(observation or {}, calibration, mapping)
 
 
 def decode_signed_15bit(value):
@@ -573,6 +802,10 @@ class NativeFeetechSTSBus(object):
     def write_byte(self, motor_id, address, value):
         self._txrx(motor_id, STS_INST_WRITE, [address, int(value) & 0xFF], expected_min=6)
 
+    def write_word(self, motor_id, address, value):
+        encoded = encode_signed_15bit(value)
+        self._txrx(motor_id, STS_INST_WRITE, [address, encoded & 0xFF, (encoded >> 8) & 0xFF], expected_min=6)
+
     def sync_write_word(self, address, ids_values):
         params = [address, 2]
         for motor_id, value in sorted(ids_values.items()):
@@ -653,6 +886,7 @@ class RawTeleopSession(object):
         self.last_leader_raw = {}
         self.last_follower_raw = {}
         self.last_goal_raw = {}
+        self.last_gripper_debug = {}
         self.last_step_ms = 0
         self.frames = 0
         self.recorded_points = []
@@ -693,6 +927,7 @@ class RawTeleopSession(object):
                 "last_leader_raw": dict(self.last_leader_raw),
                 "last_follower_raw": dict(self.last_follower_raw),
                 "last_goal_raw": dict(self.last_goal_raw),
+                "last_gripper_debug": dict(self.last_gripper_debug),
                 "last_step_ms": self.last_step_ms,
                 "calibration": dict(self.teleop_calibration),
             }
@@ -774,6 +1009,10 @@ class RawTeleopSession(object):
         }
         write_json(TELEOP_CALIBRATION_PATH, payload)
         self.set_calibration(payload)
+        health = calibration_health_check(payload, self.leader_calibration, self.calibration)
+        payload["health"] = health
+        if not health["ok"]:
+            self._log("calibration_health_warning", health)
         return payload
 
     def start(self, follower_driver, options=None):
@@ -835,6 +1074,16 @@ class RawTeleopSession(object):
             480.0,
         )
         max_step_raw = clamp(float(options.get("max_step_raw", self.serial_config.get("teleop_max_step_raw", 24.0))), 2.0, 200.0)
+        # Per-joint step so all 6 axes cover the same fraction of their own range per cycle.
+        # Without this, a single raw-unit step is ~1.7x larger for the gripper than for the shoulder,
+        # making the gripper visibly out of sync with the other axes.
+        joint_ranges = []
+        for name in JOINT_NAMES:
+            rmin = int(self.calibration[name]["range_min"])
+            rmax = int(self.calibration[name]["range_max"])
+            joint_ranges.append(max(1, rmax - rmin))
+        max_range = max(joint_ranges)
+        per_joint_step = [max(1.0, max_step_raw * float(r) / float(max_range)) for r in joint_ranges]
         leader_cfg = self._leader_config()
         if options.get("leader_port"):
             leader_cfg["port"] = options.get("leader_port")
@@ -854,6 +1103,8 @@ class RawTeleopSession(object):
             calibration_ok = bool(calibration_payload.get("calibrated"))
             if not calibration_ok:
                 raise RuntimeError("请先点击“同步当前位置为校准”，保存主从同姿态校准后再开始跟随")
+            if bool(self.serial_config.get("auto_apply_gripper_angle_limits", True)):
+                self.follower_driver.apply_gripper_angle_limits(strict=False)
             leader_now_at_start = self.leader_bus.read_present_positions(leader_ids)
             follower_now_at_start = self.follower_driver.bus.read_present_positions(follower_ids)
             cal_leader_ids = parse_int_list(calibration_payload.get("leader_ids"), leader_ids)
@@ -864,15 +1115,31 @@ class RawTeleopSession(object):
             follower_start = normalize_raw_by_id(calibration_payload.get("follower_raw"))
             if sorted(leader_start.keys()) != sorted([int(v) for v in leader_ids]) or sorted(follower_start.keys()) != sorted([int(v) for v in follower_ids]):
                 raise RuntimeError("主从校准文件不完整，请重新同步当前位置为校准")
+            gripper_index = JOINT_NAMES.index("gripper")
+            leader_start[int(leader_ids[gripper_index])] = int(leader_now_at_start[int(leader_ids[gripper_index])])
+            follower_start[int(follower_ids[gripper_index])] = int(follower_now_at_start[int(follower_ids[gripper_index])])
+            gripper_hold_until = time.time() + float(clamp(float(options.get("gripper_start_hold_sec", self.serial_config.get("teleop_gripper_start_hold_sec", 0.8))), 0.0, 3.0))
             self.follower_driver.bus.sync_write_word(STS_ADDR_GOAL_POSITION, follower_now_at_start)
             for motor_id in follower_ids:
                 self.follower_driver.bus.write_byte(motor_id, STS_ADDR_TORQUE_ENABLE, 1)
+                self.follower_driver.bus.write_word(int(motor_id), STS_ADDR_GOAL_POSITION, int(follower_now_at_start[int(motor_id)]))
+            # Some STS servos resume the previous goal when torque is enabled. Re-write
+            # the current physical pose after torque is on so startup cannot jump.
+            for _ in range(3):
+                self.follower_driver.bus.sync_write_word(STS_ADDR_GOAL_POSITION, follower_now_at_start)
+                self.follower_driver.bus.write_word(int(follower_ids[gripper_index]), STS_ADDR_GOAL_POSITION, int(follower_now_at_start[int(follower_ids[gripper_index])]))
+                time.sleep(0.02)
             self.follower_driver.torque_enabled = True
             current_goal = dict(follower_now_at_start)
             with self.lock:
                 self.last_leader_raw = dict(leader_now_at_start)
                 self.last_follower_raw = dict(follower_now_at_start)
                 self.last_goal_raw = dict(current_goal)
+                self.last_gripper_debug = {
+                    "start_leader_raw": int(leader_start[int(leader_ids[gripper_index])]),
+                    "start_follower_raw": int(follower_start[int(follower_ids[gripper_index])]),
+                    "hold_until_ms": int(gripper_hold_until * 1000),
+                }
             while not self.stop_event.is_set():
                 if self.pause_event.is_set():
                     self.stop_event.wait(0.05)
@@ -892,10 +1159,24 @@ class RawTeleopSession(object):
                         leader_delta = int(leader_now[leader_id]) - int(leader_start[leader_id])
                         bounded_delta = clamp(leader_delta * gains[index] * invert[index], -max_delta[index], max_delta[index])
                         wanted = int(round(int(follower_start[follower_id]) + bounded_delta))
+                    if index == gripper_index and time.time() < gripper_hold_until:
+                        wanted = int(follower_start[follower_id])
                     previous = int(current_goal[follower_id])
-                    step = clamp(wanted - previous, -max_step_raw, max_step_raw)
+                    step = clamp(wanted - previous, -per_joint_step[index], per_joint_step[index])
                     goal[follower_id] = int(round(previous + step))
+                    if index == gripper_index:
+                        gripper_debug = {
+                            "leader_start_raw": int(leader_start[leader_id]),
+                            "follower_start_raw": int(follower_start[follower_id]),
+                            "leader_now_raw": int(leader_now[leader_id]),
+                            "wanted_raw": int(wanted),
+                            "previous_goal_raw": int(previous),
+                            "goal_raw": int(goal[follower_id]),
+                            "hold_active": bool(time.time() < gripper_hold_until),
+                        }
                 self.follower_driver.bus.sync_write_word(STS_ADDR_GOAL_POSITION, goal)
+                gripper_follower_id = int(follower_ids[gripper_index])
+                self.follower_driver.bus.write_word(gripper_follower_id, STS_ADDR_GOAL_POSITION, goal[gripper_follower_id])
                 current_goal = dict(goal)
                 now = time.time()
                 if now - self._last_record_sample_ts >= self.recording_interval:
@@ -908,12 +1189,15 @@ class RawTeleopSession(object):
                     follower_now = self.follower_driver.bus.read_present_positions(follower_ids)
                 except Exception:
                     follower_now = {}
+                gripper_present = follower_now.get(int(follower_ids[gripper_index])) if isinstance(follower_now, dict) else None
+                gripper_debug["follower_present_raw"] = int(gripper_present) if gripper_present is not None else None
                 with self.lock:
                     self.frames += 1
                     self.last_step_ms = now_ms()
                     self.last_leader_raw = dict((int(k), int(v)) for k, v in leader_now.items())
                     self.last_follower_raw = dict((int(k), int(v)) for k, v in follower_now.items())
                     self.last_goal_raw = dict((int(k), int(v)) for k, v in goal.items())
+                    self.last_gripper_debug = dict(gripper_debug)
                     self.last_error = ""
                 elapsed = time.time() - loop_start
                 wait = max(0.0, interval - elapsed)
@@ -983,7 +1267,7 @@ class LeRobotFollowerDriver(FollowerDriver):
 
         config = SO101FollowerConfig(
             port=self.serial_config.get("port", "COM6"),
-            id=self.serial_config.get("robot_id", "win7_follower"),
+            id=self.serial_config.get("robot_id", "mint_follower"),
             max_relative_target=float(self.serial_config.get("max_relative_target_deg", 2.0)),
             disable_torque_on_disconnect=False,
         )
@@ -1028,6 +1312,7 @@ class NativeSTSFollowerDriver(FollowerDriver):
         self.torque_enabled = False
         self.last_action = {}
         self.last_raw_goal = {}
+        self.last_gripper_limit_sync = {}
 
     def _ids(self):
         return [int(self.calibration[name]["id"]) for name in JOINT_NAMES]
@@ -1053,6 +1338,8 @@ class NativeSTSFollowerDriver(FollowerDriver):
                 )
             raise RuntimeError("舵机型号不匹配 wrong=%s found=%s" % (wrong, found))
         self.connected = True
+        if bool(self.serial_config.get("auto_apply_gripper_angle_limits", True)):
+            self.apply_gripper_angle_limits(strict=False)
         return {
             "ok": True,
             "dry_run": False,
@@ -1077,12 +1364,87 @@ class NativeSTSFollowerDriver(FollowerDriver):
         self.torque_enabled = False
 
     def _enable_torque_at_current_position(self):
+        if bool(self.serial_config.get("auto_apply_gripper_angle_limits", True)):
+            self.apply_gripper_angle_limits(strict=False)
         present_by_id = self.bus.read_present_positions(self._ids())
         self.bus.sync_write_word(STS_ADDR_GOAL_POSITION, present_by_id)
         for motor_id in self._ids():
             self.bus.write_byte(motor_id, STS_ADDR_TORQUE_ENABLE, 1)
+            self.bus.write_word(motor_id, STS_ADDR_GOAL_POSITION, present_by_id[motor_id])
+        for _ in range(2):
+            self.bus.sync_write_word(STS_ADDR_GOAL_POSITION, present_by_id)
+            time.sleep(0.02)
         self.torque_enabled = True
         return present_by_id
+
+    def apply_gripper_angle_limits(self, strict=False):
+        if not self.connected:
+            if strict:
+                raise RuntimeError("从臂未连接，不能同步夹爪舵机角度限制")
+            return {"ok": False, "error": "not connected"}
+        motor_id = int(self.calibration["gripper"]["id"])
+        range_min = int(clamp(int(self.calibration["gripper"]["range_min"]), 0, STS_MAX_RESOLUTION))
+        range_max = int(clamp(int(self.calibration["gripper"]["range_max"]), 0, STS_MAX_RESOLUTION))
+        if range_min >= range_max:
+            message = "从臂夹爪 range_min=%d 必须小于 range_max=%d" % (range_min, range_max)
+            if strict:
+                raise RuntimeError(message)
+            return {"ok": False, "error": message}
+        before = {}
+        after = {}
+        try:
+            try:
+                before = {
+                    "min_angle_limit": int(self.bus.read_word(motor_id, STS_ADDR_MIN_ANGLE_LIMIT)),
+                    "max_angle_limit": int(self.bus.read_word(motor_id, STS_ADDR_MAX_ANGLE_LIMIT)),
+                    "torque_limit": int(self.bus.read_word(motor_id, STS_ADDR_TORQUE_LIMIT)),
+                }
+            except Exception:
+                before = {}
+            if before.get("min_angle_limit") == range_min and before.get("max_angle_limit") == range_max:
+                result = {
+                    "ok": True,
+                    "changed": False,
+                    "motor_id": motor_id,
+                    "range_min": range_min,
+                    "range_max": range_max,
+                    "before": before,
+                    "after": dict(before),
+                }
+                self.last_gripper_limit_sync = dict(result)
+                return result
+            self.bus.write_byte(motor_id, STS_ADDR_TORQUE_ENABLE, 0)
+            self.bus.write_byte(motor_id, STS_ADDR_EEPROM_LOCK, 0)
+            self.bus.write_word(motor_id, STS_ADDR_MIN_ANGLE_LIMIT, range_min)
+            self.bus.write_word(motor_id, STS_ADDR_MAX_ANGLE_LIMIT, range_max)
+            self.bus.write_byte(motor_id, STS_ADDR_EEPROM_LOCK, 1)
+            self.torque_enabled = False
+            try:
+                after = {
+                    "min_angle_limit": int(self.bus.read_word(motor_id, STS_ADDR_MIN_ANGLE_LIMIT)),
+                    "max_angle_limit": int(self.bus.read_word(motor_id, STS_ADDR_MAX_ANGLE_LIMIT)),
+                    "torque_limit": int(self.bus.read_word(motor_id, STS_ADDR_TORQUE_LIMIT)),
+                }
+            except Exception:
+                after = {}
+            result = {
+                "ok": True,
+                "changed": True,
+                "motor_id": motor_id,
+                "range_min": range_min,
+                "range_max": range_max,
+                "before": before,
+                "after": after,
+            }
+            self.last_gripper_limit_sync = dict(result)
+            return result
+        except Exception as exc:
+            message = "同步从臂夹爪舵机角度限制失败: %s: %s" % (type(exc).__name__, exc)
+            result = {"ok": False, "motor_id": motor_id, "range_min": range_min, "range_max": range_max, "error": message}
+            self.last_gripper_limit_sync = dict(result)
+            if strict:
+                raise RuntimeError(message)
+            return result
 
     def send_positions(self, positions):
         if not self.connected:
@@ -1093,6 +1455,8 @@ class NativeSTSFollowerDriver(FollowerDriver):
         raw_goal_by_name = lerobot_action_to_raw_goal(action, self.calibration)
         raw_goal_by_id = dict((int(self.calibration[name]["id"]), raw_goal_by_name[name]) for name in JOINT_NAMES)
         self.bus.sync_write_word(STS_ADDR_GOAL_POSITION, raw_goal_by_id)
+        gripper_id = int(self.calibration["gripper"]["id"])
+        self.bus.write_word(gripper_id, STS_ADDR_GOAL_POSITION, raw_goal_by_id[gripper_id])
         self.last_action = dict(action)
         self.last_raw_goal = dict(raw_goal_by_name)
         result = dict(action)
@@ -1210,7 +1574,7 @@ class DemoRuntime(object):
         self.stop_event = threading.Event()
         self.pause_event = threading.Event()
         self.state = {
-            "schema": "so101_win7_runtime_status.v1",
+            "schema": "so101_mint_runtime_status.v1",
             "started_ms": now_ms(),
             "connected": False,
             "busy": False,
@@ -1227,7 +1591,7 @@ class DemoRuntime(object):
             "control_initialized": False,
             "control_init_source": "",
             "event_count": 0,
-            "boundary": "Win7 fallback follower demo; not ROS2, not grasp success, not trainable_real",
+            "boundary": "Mint fallback follower demo; not ROS2, not grasp success, not trainable_real",
         }
         self.driver = self._make_driver()
         self.teleop = RawTeleopSession(self.serial_config, self.calibration)
@@ -1322,8 +1686,11 @@ class DemoRuntime(object):
                         observation = self.driver.get_observation()
                     if observation:
                         self._cached_obs = observation
+                        self._auto_initialize_control_from_observation(observation, "status_observation")
                 except Exception as exc:
                     self.state["last_error"] = "observation refresh failed: %s: %s" % (type(exc).__name__, exc)
+            elif self.state.get("connected") and not self.state.get("control_initialized"):
+                self._auto_initialize_control_from_observation(self._cached_obs, "cached_observation")
             result = dict(self.state)
             result["templates"] = sorted(self.templates.get("templates", {}).keys())
             result["log_path"] = self.log_path
@@ -1337,6 +1704,23 @@ class DemoRuntime(object):
     def _assert_control_initialized(self):
         if self._requires_control_initialization() and not bool(self.state.get("control_initialized")):
             raise RuntimeError("control is not initialized from current hardware position")
+
+    def _auto_initialize_control_from_observation(self, observation, source):
+        if not self._requires_control_initialization():
+            return False
+        if not self.state.get("connected") or self.state.get("control_initialized"):
+            return False
+        try:
+            positions = observation_to_manual_positions(observation or {}, self.calibration, self.serial_config.get("mapping", {}))
+        except Exception:
+            positions = None
+        if positions is None:
+            return False
+        self.state["control_initialized"] = True
+        self.state["control_init_source"] = source
+        self.state["last_waypoint"] = source
+        self._log("control_auto_initialized", {"source": source, "positions": positions})
+        return True
 
     def _ensure_port_access(self):
         port = self.serial_config.get("port", "")
@@ -1422,6 +1806,13 @@ class DemoRuntime(object):
             self._log("teleop_calibrated", payload)
         return {"ok": True, "calibration": payload, "file": TELEOP_CALIBRATION_PATH}
 
+    def check_teleop_calibration_health(self):
+        payload = self.teleop.teleop_calibration if self.teleop else {}
+        leader_cal = read_json(LEADER_CALIBRATION_PATH) if os.path.exists(LEADER_CALIBRATION_PATH) else {}
+        follower_cal = dict(self.calibration or {})
+        health = calibration_health_check(payload, leader_cal, follower_cal)
+        return {"ok": True, "calibration": payload, "health": health}
+
     def prepare_teleop_calibration(self):
         with self.lock:
             if self.state.get("monitor_mode"):
@@ -1441,6 +1832,191 @@ class DemoRuntime(object):
                 "message": "已释放从臂力矩。请手动把主臂和从臂摆成同一姿态，然后再次点击“保存当前位置对齐”。",
                 "torque_released": True,
             }
+
+    def _leader_bus_config(self, body=None):
+        body = body or {}
+        cfg = dict(self.serial_config)
+        cfg["port"] = str(body.get("leader_port") or self.serial_config.get("leader_port", "/dev/ttyACM1")).strip()
+        cfg["backend"] = self.serial_config.get("leader_backend", self.serial_config.get("backend", "native_posix"))
+        return cfg
+
+    def _save_gripper_min_calibration_file(self, arm, path, raw):
+        payload = read_json(path)
+        gripper = dict(payload.get("gripper", {}))
+        old_min = int(gripper.get("range_min", 0))
+        range_max = int(gripper.get("range_max", 4095))
+        if int(raw) >= range_max - 20:
+            raise RuntimeError("%s夹爪 raw=%d 接近或超过 range_max=%d，请确认夹爪已经推到闭合端" % (arm, int(raw), range_max))
+        backup_path = backup_file(path)
+        payload["gripper"]["range_min"] = int(raw)
+        write_json(path, payload)
+        return payload, old_min, range_max, backup_path
+
+    def prepare_gripper_min_calibration(self, body):
+        body = body or {}
+        arm = "leader" if str(body.get("arm", "")).strip().lower() == "leader" else "follower"
+        with self.lock:
+            if self.state.get("monitor_mode"):
+                raise RuntimeError("夹爪校准只能在动作模式下进行")
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能校准夹爪")
+        if arm == "leader":
+            payload = read_json(LEADER_CALIBRATION_PATH)
+            motor_id = int(payload["gripper"]["id"])
+            bus = NativeFeetechSTSBus(self._leader_bus_config(body))
+            try:
+                bus.connect()
+                bus.write_byte(motor_id, STS_ADDR_TORQUE_ENABLE, 0)
+            finally:
+                bus.disconnect()
+        else:
+            with self.lock:
+                if not (self.state.get("connected") and getattr(self.driver, "connected", False)):
+                    raise RuntimeError("请先连接从臂")
+                motor_id = int(self.calibration["gripper"]["id"])
+                bus = getattr(self.driver, "bus", None)
+                if bus is None:
+                    raise RuntimeError("当前后端不支持单独释放夹爪力矩")
+                bus.write_byte(motor_id, STS_ADDR_TORQUE_ENABLE, 0)
+                self.state["control_initialized"] = False
+                self.state["control_init_source"] = ""
+                self.state["last_error"] = ""
+        with self.lock:
+            self._log("gripper_min_prepare", {"arm": arm, "motor_id": motor_id})
+            return {
+                "ok": True,
+                "arm": arm,
+                "motor_id": motor_id,
+                "message": "已释放%s夹爪力矩。请手动把夹爪推到闭合端，然后保存闭合端。" % ("主臂" if arm == "leader" else "从臂"),
+            }
+
+    def save_gripper_min_calibration(self, body):
+        body = body or {}
+        arm = "leader" if str(body.get("arm", "")).strip().lower() == "leader" else "follower"
+        limit_sync = {}
+        with self.lock:
+            if self.state.get("monitor_mode"):
+                raise RuntimeError("夹爪校准只能在动作模式下进行")
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能校准夹爪")
+        if arm == "leader":
+            payload = read_json(LEADER_CALIBRATION_PATH)
+            motor_id = int(payload["gripper"]["id"])
+            bus = NativeFeetechSTSBus(self._leader_bus_config(body))
+            try:
+                bus.connect()
+                raw = decode_signed_15bit(bus.read_word(motor_id, STS_ADDR_PRESENT_POSITION))
+            finally:
+                bus.disconnect()
+            payload, old_min, range_max, backup_path = self._save_gripper_min_calibration_file("主臂", LEADER_CALIBRATION_PATH, raw)
+            if self.teleop:
+                self.teleop.leader_calibration = payload
+                self.teleop.leader_calibration_by_id = calibration_by_id(payload)
+        else:
+            with self.lock:
+                if not (self.state.get("connected") and getattr(self.driver, "connected", False)):
+                    raise RuntimeError("请先连接从臂")
+                motor_id = int(self.calibration["gripper"]["id"])
+                bus = getattr(self.driver, "bus", None)
+                if bus is None:
+                    raise RuntimeError("当前后端不支持读取夹爪位置")
+                raw = decode_signed_15bit(bus.read_word(motor_id, STS_ADDR_PRESENT_POSITION))
+            payload, old_min, range_max, backup_path = self._save_gripper_min_calibration_file("从臂", FOLLOWER_CALIBRATION_PATH, raw)
+            self.calibration = payload
+            if hasattr(self.driver, "calibration"):
+                self.driver.calibration = self.calibration
+            if hasattr(self.driver, "apply_gripper_angle_limits"):
+                limit_sync = self.driver.apply_gripper_angle_limits(strict=False)
+            if self.teleop:
+                self.teleop.calibration = self.calibration
+                self.teleop.follower_calibration_by_id = calibration_by_id(self.calibration)
+        with self.lock:
+            self._log("gripper_min_saved", {
+                "arm": arm,
+                "motor_id": motor_id,
+                "old_range_min": old_min,
+                "new_range_min": int(raw),
+                "range_max": range_max,
+                "backup": backup_path,
+                "limit_sync": limit_sync,
+            })
+        return {
+            "ok": True,
+            "arm": arm,
+            "motor_id": motor_id,
+            "old_range_min": old_min,
+            "new_range_min": int(raw),
+            "range_max": range_max,
+            "backup": backup_path,
+            "file": LEADER_CALIBRATION_PATH if arm == "leader" else FOLLOWER_CALIBRATION_PATH,
+            "limit_sync": limit_sync,
+        }
+
+    def prepare_follower_gripper_min_calibration(self):
+        return self.prepare_gripper_min_calibration({"arm": "follower"})
+
+    def save_follower_gripper_min_calibration(self):
+        return self.save_gripper_min_calibration({"arm": "follower"})
+
+    def test_follower_gripper_close(self, body):
+        body = body or {}
+        with self.lock:
+            if self.state.get("monitor_mode"):
+                raise RuntimeError("夹爪闭合测试只能在动作模式下进行")
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能测试夹爪")
+            if not (self.state.get("connected") and getattr(self.driver, "connected", False)):
+                raise RuntimeError("请先连接从臂")
+        motor_id = int(self.calibration["gripper"]["id"])
+        target = int(body.get("raw", self.calibration["gripper"]["range_min"]))
+        target = int(clamp(target, 0, 4095))
+        duration = float(clamp(float(body.get("duration", 3.0)), 0.5, 8.0))
+        interval = float(clamp(float(body.get("interval", 0.08)), 0.03, 0.5))
+        bus = getattr(self.driver, "bus", None)
+        if bus is None:
+            raise RuntimeError("当前后端不支持夹爪 raw 测试")
+        limit_sync = {}
+        if hasattr(self.driver, "apply_gripper_angle_limits"):
+            limit_sync = self.driver.apply_gripper_angle_limits(strict=True)
+        start_raw = decode_signed_15bit(bus.read_word(motor_id, STS_ADDR_PRESENT_POSITION))
+        bus.write_byte(motor_id, STS_ADDR_TORQUE_ENABLE, 1)
+        self.driver.torque_enabled = True
+        for _ in range(3):
+            bus.write_word(motor_id, STS_ADDR_GOAL_POSITION, start_raw)
+            time.sleep(0.02)
+        samples = []
+        deadline = time.time() + duration
+        while time.time() < deadline:
+            bus.write_word(motor_id, STS_ADDR_GOAL_POSITION, target)
+            time.sleep(interval)
+            try:
+                present = decode_signed_15bit(bus.read_word(motor_id, STS_ADDR_PRESENT_POSITION))
+                samples.append(int(present))
+            except Exception:
+                pass
+        final_raw = samples[-1] if samples else decode_signed_15bit(bus.read_word(motor_id, STS_ADDR_PRESENT_POSITION))
+        self.driver.torque_enabled = True
+        with self.lock:
+            self.state["last_action"] = {
+                "type": "follower_gripper_close_test",
+                "motor_id": motor_id,
+                "start_raw": int(start_raw),
+                "target_raw": int(target),
+                "final_raw": int(final_raw),
+                "samples": samples[-20:],
+                "limit_sync": limit_sync,
+            }
+            self._log("follower_gripper_close_test", self.state["last_action"])
+        return {
+            "ok": True,
+            "motor_id": motor_id,
+            "start_raw": int(start_raw),
+            "target_raw": int(target),
+            "final_raw": int(final_raw),
+            "error_raw": int(final_raw) - int(target),
+            "samples": samples,
+            "limit_sync": limit_sync,
+        }
 
     def start_teleop(self, body):
         with self.lock:
@@ -1488,24 +2064,14 @@ class DemoRuntime(object):
         result = self.teleop.stop()
         points = result.get("recorded_points") or []
         delay = result.get("recording_delay", 0.25)
-        saved_recording = None
-        save_error = ""
-        if len(points) >= 2:
-            try:
-                saved_recording = self._save_recording_unlocked("teleop_%s" % time.strftime("%Y%m%d_%H%M%S"), points, delay)
-            except Exception as exc:
-                save_error = "%s: %s" % (type(exc).__name__, exc)
         with self.lock:
             self.state["busy"] = False
             self.state["execution_state"] = "idle"
             if result.get("teleop", {}).get("last_error"):
                 self.state["last_error"] = result["teleop"]["last_error"]
-            if save_error:
-                self.state["last_error"] = "主从录制保存失败: %s" % save_error
-            result["saved_recording"] = saved_recording
+            result["saved_recording"] = None
             result["recorded_samples"] = len(points)
-            if save_error:
-                result["recording_error"] = save_error
+            result["recorded_delay"] = delay
             self._log("teleop_stop_requested", result)
         return result
 
@@ -1945,6 +2511,114 @@ class DemoRuntime(object):
             self._log("recording_saved", {"template": template_name, "file": filename, "samples": len(normalized_points), "delay": delay})
         return {"ok": True, "template": template_name, "file": filename, "samples": len(normalized_points), "delay": delay}
 
+    def list_product_actions(self):
+        payload = load_product_actions_payload()
+        actions = sorted(payload.get("actions", []), key=lambda row: (str(row.get("status", "")), str(row.get("name", ""))))
+        return {"ok": True, "actions": actions, "run_log": list(reversed(load_business_run_log()))[:100]}
+
+    def save_product_action(self, body):
+        body = body or {}
+        name = normalize_product_action_name(body.get("name", ""))
+        template = str(body.get("template", "")).strip()
+        if template not in self.templates.get("templates", {}):
+            raise ValueError("unknown source recording template: %s" % template)
+        status = normalize_action_status(body.get("status", "draft"))
+        note = str(body.get("note", "")).strip()[:240]
+        operator = normalize_operator_name(body.get("operator", ""), "admin")
+        payload = load_product_actions_payload()
+        actions = payload.get("actions", [])
+        requested_id = str(body.get("id", "")).strip()
+        action_id = requested_id or product_action_id_from_name(name)
+        existing_ids = set(str(row.get("id", "")) for row in actions)
+        if requested_id:
+            existing_ids.discard(action_id)
+        base_id = action_id
+        index = 2
+        while action_id in existing_ids:
+            action_id = "%s_%d" % (base_id, index)
+            index += 1
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        found = None
+        if requested_id:
+            for row in actions:
+                if str(row.get("id", "")) == action_id:
+                    found = row
+                    break
+        if found is None:
+            found = {"id": action_id, "created_at": now}
+            actions.append(found)
+        found.update({
+            "id": action_id,
+            "name": name,
+            "source_template": template,
+            "status": status,
+            "note": note,
+            "updated_by": operator,
+            "updated_at": now,
+        })
+        payload["actions"] = actions
+        save_product_actions_payload(payload)
+        self._log("product_action_saved", found)
+        return {"ok": True, "action": found}
+
+    def update_product_action_status(self, action_id, status, operator):
+        status = normalize_action_status(status)
+        operator = normalize_operator_name(operator, "admin")
+        payload = load_product_actions_payload()
+        for row in payload.get("actions", []):
+            if str(row.get("id", "")) == str(action_id):
+                row["status"] = status
+                row["updated_by"] = operator
+                row["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                save_product_actions_payload(payload)
+                self._log("product_action_status_changed", row)
+                return {"ok": True, "action": row}
+        raise ValueError("product action not found: %s" % action_id)
+
+    def execute_product_action(self, action_id, repeat, operator):
+        try:
+            repeat = int(repeat)
+        except Exception:
+            repeat = 1
+        repeat = int(clamp(repeat, 1, 20))
+        payload = load_product_actions_payload()
+        action = None
+        for row in payload.get("actions", []):
+            if str(row.get("id", "")) == str(action_id):
+                action = row
+                break
+        if action is None:
+            raise ValueError("product action not found: %s" % action_id)
+        if action.get("status") != "released":
+            raise RuntimeError("产品动作未发布，不能在员工执行区运行")
+        operator = normalize_operator_name(operator, "employee")
+        started = now_ms()
+        result = "ok"
+        error = ""
+        try:
+            response = self.execute_template(action.get("source_template", ""), repeat)
+            if not response.get("ok"):
+                result = "stopped" if response.get("stopped") else "failed"
+                error = response.get("error", "")
+            return response
+        except Exception as exc:
+            result = "failed"
+            error = "%s: %s" % (type(exc).__name__, exc)
+            raise
+        finally:
+            append_business_run_log({
+                "ts_ms": now_ms(),
+                "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "duration_ms": now_ms() - started,
+                "operator": operator,
+                "action_id": action.get("id", ""),
+                "action_name": action.get("name", ""),
+                "source_template": action.get("source_template", ""),
+                "repeat": repeat,
+                "result": result,
+                "error": error,
+            })
+
     def connect(self, user_requested=True):
         with self.lock:
             if user_requested and self.state.get("busy"):
@@ -1983,6 +2657,7 @@ class DemoRuntime(object):
                     }
                 if observation:
                     self._cached_obs = observation
+                    self._auto_initialize_control_from_observation(observation, "connect_observation")
             else:
                 self.state["last_error"] = result.get("error", "connect failed")
             if user_requested:
@@ -2079,13 +2754,21 @@ class DemoRuntime(object):
             self.pause_event.clear()
 
         try:
-            self._assert_control_initialized()
             if not (self.state.get("connected") and getattr(self.driver, "connected", False)):
-                raise RuntimeError("请先连接硬件并同步当前关节读数")
+                raise RuntimeError("请先连接硬件")
             results = []
             template_delays = self.templates.get("template_delays", {})
             delay = float(template_delays.get(template_name, self.serial_config.get("command_step_delay_sec", 0.8)))
             waypoints = self.templates.get("waypoints", {})
+            # Pre-roll: smooth-interpolate from the current physical position to the
+            # first waypoint so the 6 axes do not jump to an out-of-sync start.
+            first_waypoint = waypoints.get(sequence[0]) if sequence else None
+            if first_waypoint is not None:
+                pre_roll = self._interpolate_to_target(first_waypoint, "pre_roll_to_%s" % sequence[0])
+                if pre_roll:
+                    results.append({"pre_roll": True, "waypoint": sequence[0], "steps": pre_roll})
+                if self.stop_event.is_set():
+                    return {"ok": False, "stopped": True, "template": template_name, "repeat": repeat, "steps": results, "error": "execution stopped by user during pre-roll"}
             interrupted = False
             for repeat_index in range(repeat):
                 for waypoint_name in sequence:
@@ -2169,11 +2852,11 @@ class DemoRuntime(object):
         try:
             observation = self.driver.get_observation()
             if observation:
-                current = raw_present_to_manual_positions(observation, self.calibration, self.serial_config.get("mapping", {}))
+                current = observation_to_manual_positions(observation, self.calibration, self.serial_config.get("mapping", {}))
         except Exception:
             current = None
         if current is None:
-            current = raw_present_to_manual_positions(self._cached_obs, self.calibration, self.serial_config.get("mapping", {}))
+            current = observation_to_manual_positions(self._cached_obs, self.calibration, self.serial_config.get("mapping", {}))
         if current is None:
             raise RuntimeError("当前没有完整关节读数，不能安全回安全点")
         waypoints = []
@@ -2182,22 +2865,70 @@ class DemoRuntime(object):
             waypoints.append([current[i] + (safe_point[i] - current[i]) * ratio for i in range(len(JOINT_NAMES))])
         return self.execute_position_sequence(waypoints, delay, "safe_point")
 
-    def execute_position_sequence(self, sequence, delay, label):
+    def _interpolate_to_target(self, target_positions, label, min_step_ratio=0.02):
+        """Smoothly move from the current physical position to target_positions.
+
+        Returns the list of step results from execute_position_sequence.
+        Skips interpolation (and falls back to a direct send) when the per-joint
+        distance is below min_step_ratio of each joint's full calibrated range,
+        to avoid slowing down small adjustments.
+        """
+        target = normalize_manual_positions(target_positions)
+        observation = None
+        try:
+            observation = self.driver.get_observation()
+        except Exception:
+            observation = None
+        current = None
+        if observation:
+            current = observation_to_manual_positions(observation, self.calibration, self.serial_config.get("mapping", {}))
+        if current is None:
+            current = observation_to_manual_positions(self._cached_obs, self.calibration, self.serial_config.get("mapping", {}))
+        if current is None:
+            raise RuntimeError("当前没有完整关节读数，无法平滑过渡到目标位姿")
+        # Decide whether to interpolate. Skip if all 6 axes are already close to target.
+        close_enough = True
+        for index, name in enumerate(JOINT_NAMES):
+            rmin = float(self.calibration[name]["range_min"])
+            rmax = float(self.calibration[name]["range_max"])
+            span = max(1e-6, rmax - rmin)
+            if name == "gripper":
+                span_norm = 1.0
+            else:
+                span_norm = span * (2.0 * math.pi) / STS_MAX_RESOLUTION
+            if abs(current[index] - target[index]) / span_norm > min_step_ratio:
+                close_enough = False
+                break
+        if close_enough:
+            sent = self.driver.send_positions(target)
+            return [{"step": 0, "sent": sent}]
+        steps = int(clamp(int(self.serial_config.get("safe_point_steps", 12)), 2, 60))
+        delay = float(clamp(float(self.serial_config.get("safe_point_step_delay_sec", 0.25)), 0.05, 2.0))
+        waypoints = []
+        for index in range(1, steps + 1):
+            ratio = float(index) / float(steps)
+            waypoints.append([current[i] + (target[i] - current[i]) * ratio for i in range(len(JOINT_NAMES))])
+        result = self.execute_position_sequence(waypoints, delay, label, manage_state=False, require_initialized=False)
+        return result.get("steps", [])
+
+    def execute_position_sequence(self, sequence, delay, label, manage_state=True, require_initialized=True):
         if not sequence:
             raise ValueError("position sequence is empty")
-        with self.lock:
-            if self.state.get("busy"):
-                raise RuntimeError("runtime is busy")
-            self.state["busy"] = True
-            self.state["execution_state"] = "running"
-            self.state["last_template"] = ""
-            self.state["last_waypoint"] = label
-            self.state["last_error"] = ""
-            self.stop_event.clear()
-            self.pause_event.clear()
+        if manage_state:
+            with self.lock:
+                if self.state.get("busy"):
+                    raise RuntimeError("runtime is busy")
+                self.state["busy"] = True
+                self.state["execution_state"] = "running"
+                self.state["last_template"] = ""
+                self.state["last_waypoint"] = label
+                self.state["last_error"] = ""
+                self.stop_event.clear()
+                self.pause_event.clear()
         results = []
         try:
-            self._assert_control_initialized()
+            if require_initialized:
+                self._assert_control_initialized()
             if not (self.state.get("connected") and getattr(self.driver, "connected", False)):
                 raise RuntimeError("请先连接硬件并同步当前关节读数")
             for index, positions in enumerate(sequence):
@@ -2230,10 +2961,11 @@ class DemoRuntime(object):
                 self._log("position_sequence_failed", {"label": label, "error": self.state["last_error"], "trace": traceback.format_exc()})
             raise
         finally:
-            with self.lock:
-                self.state["busy"] = False
-                self.state["execution_state"] = "idle" if not self.stop_event.is_set() else "stopped"
-                self.pause_event.clear()
+            if manage_state:
+                with self.lock:
+                    self.state["busy"] = False
+                    self.state["execution_state"] = "idle" if not self.stop_event.is_set() else "stopped"
+                    self.pause_event.clear()
 
     def execute_positions(self, positions, label):
         normalized = normalize_manual_positions(positions)
@@ -2255,7 +2987,10 @@ class DemoRuntime(object):
                 raise RuntimeError("请先连接硬件并同步当前关节读数")
             if self.stop_event.is_set():
                 raise RuntimeError("execution stopped by user")
-            sent = self.driver.send_positions(normalized)
+            # Pre-roll interpolation so the 6 axes start in sync with the current pose
+            # rather than snapping to the target and leaving some axes still moving.
+            pre_roll = self._interpolate_to_target(normalized, "manual_alignment_%s" % label)
+            sent = pre_roll[-1]["sent"] if pre_roll else self.driver.send_positions(normalized)
             try:
                 observation = self.driver.get_observation()
             except Exception as exc:
@@ -2319,7 +3054,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "SO101Win7Demo/0.1"
+    server_version = "SO101MintDemo/0.1"
 
     def _send_json(self, payload, status=200):
         raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -2359,6 +3094,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(templates_response)
             elif path == "/api/recordings":
                 self._send_json(RUNTIME.list_recordings())
+            elif path == "/api/product-actions":
+                self._send_json(RUNTIME.list_product_actions())
+            elif path == "/api/login-records":
+                self._send_json({"ok": True, "records": list(reversed(load_login_records()))})
+            elif path == "/api/teleop/calibration-health":
+                self._send_json(RUNTIME.check_teleop_calibration_health())
             elif path in ("", "/"):
                 self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
             elif path == "/app.js":
@@ -2390,12 +3131,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(RUNTIME.set_mode(body.get("mode", "")))
             elif path == "/api/observation":
                 self._send_json(RUNTIME.read_observation())
+            elif path == "/api/login":
+                record = append_login_record(body.get("role", ""), body.get("operator", ""), self.headers.get("User-Agent", ""))
+                self._send_json({"ok": True, "session": {"role": record["role"], "operator": record["operator"], "login_id": record["id"]}, "record": record})
+            elif path == "/api/login-records/clear":
+                save_login_records([])
+                self._send_json({"ok": True, "records": []})
             elif path == "/api/teleop/scan":
                 self._send_json(RUNTIME.scan_leader(body.get("leader_port", ""), body.get("leader_ids", [])))
             elif path == "/api/teleop/prepare-calibration":
                 self._send_json(RUNTIME.prepare_teleop_calibration())
             elif path == "/api/teleop/calibrate":
                 self._send_json(RUNTIME.calibrate_teleop(body))
+            elif path == "/api/gripper/prepare-min":
+                self._send_json(RUNTIME.prepare_gripper_min_calibration(body))
+            elif path == "/api/gripper/save-min":
+                self._send_json(RUNTIME.save_gripper_min_calibration(body))
+            elif path == "/api/follower-gripper/prepare-min":
+                self._send_json(RUNTIME.prepare_follower_gripper_min_calibration())
+            elif path == "/api/follower-gripper/save-min":
+                self._send_json(RUNTIME.save_follower_gripper_min_calibration())
+            elif path == "/api/follower-gripper/close-test":
+                self._send_json(RUNTIME.test_follower_gripper_close(body))
             elif path == "/api/teleop/start":
                 self._send_json(RUNTIME.start_teleop(body))
             elif path == "/api/teleop/pause":
@@ -2414,6 +3171,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(RUNTIME.rename_recording(body.get("kind", ""), body.get("id", ""), body.get("name", "")))
             elif path == "/api/recording/delete":
                 self._send_json(RUNTIME.delete_recording(body.get("kind", ""), body.get("id", "")))
+            elif path == "/api/product-action/save":
+                self._send_json(RUNTIME.save_product_action(body))
+            elif path == "/api/product-action/status":
+                self._send_json(RUNTIME.update_product_action_status(body.get("id", ""), body.get("status", ""), body.get("operator", "")))
+            elif path == "/api/product-action/run":
+                self._send_json(RUNTIME.execute_product_action(body.get("id", ""), body.get("repeat", 1), body.get("operator", "")))
             elif path == "/api/action":
                 if "positions" in body:
                     self._send_json(RUNTIME.execute_positions(body.get("positions"), body.get("label", "manual_six_axis")))
@@ -2434,7 +3197,7 @@ def main():
     port = int(RUNTIME.serial_config.get("http_port", 8765))
     url = "http://%s:%d" % (host, port)
     server = ThreadedHTTPServer((host, port), Handler)
-    print("SO101 Win7 follower demo")
+    print("SO101 Mint follower demo")
     print("Frontend: %s" % url)
     print("API: %s/api/status" % url)
     print("mode=%s port=%s log=%s" % (

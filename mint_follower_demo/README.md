@@ -1,6 +1,6 @@
 # SO101 Lightweight Follower Demo
 
-This is a lightweight fallback runtime for graduation-project demos on old Windows 7 or low-spec Linux machines.
+This is a lightweight runtime for graduation-project demos on Linux Mint or other low-spec Linux machines.
 It does not require ROS2, Gazebo, RViz, MoveIt2, Node.js, or Java.
 
 ## What It Demonstrates
@@ -13,7 +13,7 @@ It is a small follower-side loop, not the full ROS2 system.
 
 ## Requirements
 
-- Windows 7 SP1 or newer, or Linux Mint / Ubuntu-like Linux
+- Linux Mint 21/22 or another Ubuntu-like Linux
 - Python 3.8.x recommended. Linux Mint 22.3 can use system `python3`.
 - A modern enough browser for local HTML/JS
 
@@ -28,13 +28,6 @@ Optional environment check:
 
 ```bash
 python3 check_environment.py
-```
-
-Windows 7:
-
-```bat
-cd win7_follower_demo
-run_demo.bat
 ```
 
 Linux Mint:
@@ -278,18 +271,6 @@ Edit:
 config\serial_config.json
 ```
 
-Windows 7 set:
-
-```json
-{
-  "monitor_mode": false,
-  "port": "COM6",
-  "backend": "native_win32"
-}
-```
-
-`native_win32` uses Python `ctypes` and the Windows serial API directly. It sends minimal Feetech STS packets to IDs 1..6.
-
 Linux Mint set:
 
 ```json
@@ -301,6 +282,8 @@ Linux Mint set:
 ```
 
 `native_posix` uses Python stdlib `termios` and `select`, not `pyserial`.
+
+The `native_win32` backend remains in the code only for compatibility with older packages; the maintained project target is Linux Mint.
 
 If Linux reports permission denied for `/dev/ttyACM0`, run:
 
@@ -324,7 +307,7 @@ Keep `max_relative_target_deg` small for the first tests, for example `2.0`. In 
 - Keep the arm unloaded and away from table edges.
 - Use `home` before longer templates.
 - This package does not claim real grasp success.
-- This package is a Win7 fallback execution demo, not `trainable_real` and not the ROS2 acceptance suite.
+- This package is a Mint fallback execution demo, not `trainable_real` and not the ROS2 acceptance suite.
 
 ## API
 

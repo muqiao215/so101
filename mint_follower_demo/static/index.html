@@ -3,10 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>SO101 Win7 Follower Demo</title>
-  <link rel="stylesheet" href="/style.css?v=10">
+  <title>SO101 Mint Follower Demo</title>
+  <link rel="stylesheet" href="/style.css?v=13">
 </head>
 <body>
+  <section id="loginGate" class="login-gate">
+    <div class="login-card">
+      <p class="eyebrow">SO101 Console Access</p>
+      <h1>选择登录身份</h1>
+      <div class="role-tabs" role="tablist" aria-label="登录身份">
+        <button type="button" id="loginAdminTab" class="active">管理员</button>
+        <button type="button" id="loginEmployeeTab" class="secondary">员工</button>
+      </div>
+      <label class="login-field">姓名/工号 <input id="loginNameInput" type="text" maxlength="80" autocomplete="name" placeholder="例如 operator_01"></label>
+      <div class="login-actions">
+        <button type="button" id="loginEnterBtn">进入控制台</button>
+      </div>
+    </div>
+  </section>
   <main class="shell">
     <section class="hero">
       <div class="hero-top">
@@ -16,6 +30,7 @@
           <p class="hero-copy">连接硬件、采集姿态、录制动作并回放。所有会影响真实机械臂的操作都只在动作模式下开放。</p>
         </div>
         <div class="hero-status">
+          <span id="operatorBadge" class="hardware-badge unknown">未登录</span>
           <span id="modeBadge" class="hardware-badge unknown">LOADING...</span>
           <span id="hardwareBadge" class="hardware-badge unknown">Hardware: checking...</span>
           <span id="executionBadge" class="hardware-badge unknown">IDLE</span>
@@ -35,6 +50,42 @@
     <section class="panel">
       <h2>实时关节位置 <span id="jointTimestamp"></span></h2>
       <div id="jointGrid" class="joint-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>员工执行</h2>
+      <div class="product-action-grid">
+        <label>产品动作 <select id="productActionSelect"></select></label>
+        <label>执行次数 <input id="productActionRepeatInput" type="number" min="1" max="20" step="1" value="1"></label>
+        <div id="productActionMeta" class="record-count">未选择产品动作</div>
+      </div>
+      <div class="manual-actions">
+        <button id="productActionRefreshBtn" class="secondary">刷新产品动作</button>
+        <button id="productActionRunBtn">执行产品动作</button>
+      </div>
+    </section>
+
+    <section id="productActionAdminPanel" class="panel admin-panel hidden">
+      <h2>动作发布</h2>
+      <div class="product-action-grid">
+        <label>产品动作名 <input id="productActionNameInput" type="text" maxlength="80" placeholder="例如 左侧抓取"></label>
+        <label>来源录制 <select id="productActionSourceSelect"></select></label>
+        <label>状态 <select id="productActionStatusSelect">
+          <option value="draft">草稿</option>
+          <option value="released">已发布</option>
+          <option value="disabled">停用</option>
+        </select></label>
+        <label>备注 <input id="productActionNoteInput" type="text" maxlength="240" placeholder="适用产品、夹具或注意事项"></label>
+      </div>
+      <div class="manual-actions">
+        <button id="productActionSaveBtn">保存产品动作</button>
+      </div>
+      <div id="productActionAdminList" class="product-action-list"></div>
+    </section>
+
+    <section class="panel">
+      <h2>最近业务记录</h2>
+      <div id="businessRunLogList" class="business-run-log"></div>
     </section>
 
     <section class="panel">
@@ -81,6 +132,13 @@
       <div class="manual-actions">
         <button id="teleopScanBtn" class="secondary">扫描主臂</button>
         <button id="teleopCalibrateBtn" class="secondary">手动重设对齐</button>
+        <select id="gripperCalArmSelect" title="选择要校准的夹爪">
+          <option value="follower">从臂</option>
+          <option value="leader">主臂</option>
+        </select>
+        <button id="followerGripperMinBtn" class="secondary">夹爪闭合端</button>
+        <button id="followerGripperCloseTestBtn" class="secondary">从臂夹爪闭合测试</button>
+        <button id="teleopHealthBtn" class="secondary">体检当前校准</button>
         <button id="teleopStartBtn">开始跟随</button>
         <button id="teleopPauseBtn" class="secondary">暂停跟随</button>
         <button id="teleopResumeBtn" class="secondary">继续跟随</button>
@@ -115,6 +173,15 @@
       <div id="events" class="events"></div>
     </section>
 
+    <section id="loginRecordsPanel" class="panel admin-panel hidden">
+      <h2>员工登录记录</h2>
+      <div class="manual-actions">
+        <button id="loginRecordsRefreshBtn" class="secondary">刷新记录</button>
+        <button id="loginRecordsClearBtn" class="danger">清空记录</button>
+      </div>
+      <div id="loginRecordsList" class="login-records"></div>
+    </section>
+
     <section class="panel">
       <h2>六轴手动控制 <span id="manualModeHint"></span></h2>
       <div id="manualControls" class="axis-controls"></div>
@@ -125,6 +192,21 @@
       </div>
     </section>
   </main>
-  <script src="/app.js?v=25"></script>
+
+  <dialog id="savePromptDialog" class="modal-dialog">
+    <form method="dialog" class="modal-card">
+      <h3>是否保存这次录制？</h3>
+      <p id="savePromptMeta" class="modal-meta">录制信息</p>
+      <label class="modal-field">动作名称 <input id="savePromptName" type="text" maxlength="80" autocomplete="off"></label>
+      <p class="modal-hint">留空则使用默认时间戳名称。保存会同时写入模板和录制文件，丢弃则不保留任何副本。</p>
+      <div class="modal-actions">
+        <button type="button" id="savePromptSaveBtn" class="primary">保存</button>
+        <button type="button" id="savePromptDiscardBtn" class="danger">丢弃</button>
+        <button type="button" id="savePromptCancelBtn" class="secondary">取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js?v=34"></script>
 </body>
 </html>

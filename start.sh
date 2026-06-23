@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEMO_DIR="$(cd "$(dirname "${0}")/win7_follower_demo" && pwd)"
+DEMO_DIR="$(cd "$(dirname "${0}")/mint_follower_demo" && pwd)"
 LOG_DIR="$DEMO_DIR/logs"
 PID_FILE="/tmp/so101_monitor.pid"
 PORT="$(python3 -c 'import json; print(json.load(open("'"$DEMO_DIR"'/config/serial_config.json")).get("http_port", 8765))' 2>/dev/null || echo 8765)"

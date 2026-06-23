@@ -3,7 +3,7 @@
   "port": "/dev/ttyACM0",
   "dry_run": true,
   "backend": "native_posix",
-  "robot_id": "so101_follower_wsl",
+  "robot_id": "so101_follower_mint",
   "calibration_file": "config/follower_calibration.json",
   "baudrate": 1000000,
   "read_timeout_ms": 80,
