@@ -1182,8 +1182,8 @@
     return {
       leader_port: (leaderPortInput && leaderPortInput.value) || '/dev/ttyACM1',
       leader_ids: ids.length ? ids : [1, 2, 3, 4, 5, 6],
-      frequency_hz: clamp(Number((teleopFreqInput && teleopFreqInput.value) || 20), 5, 50),
-      max_step_raw: clamp(Number((teleopStepInput && teleopStepInput.value) || 24), 2, 120)
+      frequency_hz: clamp(Number((teleopFreqInput && teleopFreqInput.value) || 12), 5, 50),
+      max_step_raw: clamp(Number((teleopStepInput && teleopStepInput.value) || 12), 2, 120)
     };
   }
 

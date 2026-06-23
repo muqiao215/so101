@@ -10,8 +10,17 @@
     5,
     6
   ],
-  "teleop_frequency_hz": 20.0,
-  "teleop_max_step_raw": 24.0,
+  "teleop_frequency_hz": 12.0,
+  "teleop_max_step_raw": 12.0,
+  "teleop_deadband_raw": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    6
+  ],
+  "teleop_smoothing_alpha": 0.35,
   "teleop_max_delta_raw": [
     480,
     480,
@@ -50,6 +59,7 @@
   "scan_retry_delay_sec": 0.3,
   "max_relative_target_deg": 2.0,
   "command_step_delay_sec": 0.8,
+  "recording_smoothing_passes": 1,
   "safe_point_positions": [
     -0.0629085708411143,
     1.8619402613583462,

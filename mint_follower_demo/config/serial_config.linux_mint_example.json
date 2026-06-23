@@ -8,8 +8,13 @@
   "baudrate": 1000000,
   "read_timeout_ms": 80,
   "write_timeout_ms": 80,
+  "teleop_frequency_hz": 12.0,
+  "teleop_max_step_raw": 12.0,
+  "teleop_deadband_raw": [4, 4, 4, 4, 4, 6],
+  "teleop_smoothing_alpha": 0.35,
   "max_relative_target_deg": 2.0,
   "command_step_delay_sec": 0.8,
+  "recording_smoothing_passes": 1,
   "http_host": "127.0.0.1",
   "http_port": 8765,
   "mapping": {

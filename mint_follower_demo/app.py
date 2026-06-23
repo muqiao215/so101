@@ -494,6 +494,29 @@ def normalize_manual_positions(positions):
     return normalized
 
 
+def smooth_manual_position_points(points, passes=1):
+    passes = int(clamp(int(passes or 0), 0, 4))
+    smoothed = [normalize_manual_positions(point) for point in points]
+    if passes <= 0 or len(smoothed) < 3:
+        return smoothed
+    for _ in range(passes):
+        next_points = [list(smoothed[0])]
+        for index in range(1, len(smoothed) - 1):
+            point = []
+            for joint_index, name in enumerate(JOINT_NAMES):
+                low, high = MANUAL_LIMITS[name]
+                value = (
+                    smoothed[index - 1][joint_index] * 0.25
+                    + smoothed[index][joint_index] * 0.5
+                    + smoothed[index + 1][joint_index] * 0.25
+                )
+                point.append(clamp(value, low, high))
+            next_points.append(point)
+        next_points.append(list(smoothed[-1]))
+        smoothed = next_points
+    return smoothed
+
+
 def raw_present_to_manual_positions(observation, calibration, mapping):
     present = observation.get("present_positions") or {}
     positions = []
@@ -1064,16 +1087,26 @@ class RawTeleopSession(object):
         if len(leader_ids) != len(follower_ids):
             self._finish_with_error("主臂 ID 数量必须等于从臂 6 个关节")
             return
-        frequency = clamp(float(options.get("frequency_hz", self.serial_config.get("teleop_frequency_hz", 20.0))), 5.0, 50.0)
+        frequency = clamp(float(options.get("frequency_hz", self.serial_config.get("teleop_frequency_hz", 12.0))), 5.0, 50.0)
         interval = 1.0 / frequency
         gains = parse_float_list(options.get("gains", self.serial_config.get("teleop_gains")), self._joint_count(), 1.0)
         invert = parse_float_list(options.get("invert", self.serial_config.get("teleop_invert")), self._joint_count(), 1.0)
+        deadband_raw = parse_float_list(
+            options.get("deadband_raw", self.serial_config.get("teleop_deadband_raw")),
+            self._joint_count(),
+            4.0,
+        )
+        smoothing_alpha = clamp(
+            float(options.get("smoothing_alpha", self.serial_config.get("teleop_smoothing_alpha", 0.35))),
+            0.05,
+            1.0,
+        )
         max_delta = parse_float_list(
             options.get("max_delta_raw", self.serial_config.get("teleop_max_delta_raw")),
             self._joint_count(),
             480.0,
         )
-        max_step_raw = clamp(float(options.get("max_step_raw", self.serial_config.get("teleop_max_step_raw", 24.0))), 2.0, 200.0)
+        max_step_raw = clamp(float(options.get("max_step_raw", self.serial_config.get("teleop_max_step_raw", 12.0))), 2.0, 200.0)
         # Per-joint step so all 6 axes cover the same fraction of their own range per cycle.
         # Without this, a single raw-unit step is ~1.7x larger for the gripper than for the shoulder,
         # making the gripper visibly out of sync with the other axes.
@@ -1131,6 +1164,7 @@ class RawTeleopSession(object):
                 time.sleep(0.02)
             self.follower_driver.torque_enabled = True
             current_goal = dict(follower_now_at_start)
+            filtered_leader = dict((int(k), float(v)) for k, v in leader_now_at_start.items())
             with self.lock:
                 self.last_leader_raw = dict(leader_now_at_start)
                 self.last_follower_raw = dict(follower_now_at_start)
@@ -1147,16 +1181,26 @@ class RawTeleopSession(object):
                 loop_start = time.time()
                 leader_now = self.leader_bus.read_present_positions(leader_ids)
                 goal = {}
+                filtered_leader_raw = {}
                 for index, follower_id in enumerate(follower_ids):
                     leader_id = leader_ids[index]
+                    observed_leader_raw = float(leader_now[leader_id])
+                    previous_filtered = float(filtered_leader.get(int(leader_id), observed_leader_raw))
+                    if abs(observed_leader_raw - previous_filtered) <= float(deadband_raw[index]):
+                        filtered_value = previous_filtered
+                    else:
+                        filtered_value = previous_filtered + (observed_leader_raw - previous_filtered) * smoothing_alpha
+                    filtered_leader[int(leader_id)] = filtered_value
+                    leader_goal_raw = int(round(filtered_value))
+                    filtered_leader_raw[int(leader_id)] = leader_goal_raw
                     leader_cal = self.leader_calibration_by_id.get(int(leader_id))
                     follower_cal = self.follower_calibration_by_id.get(int(follower_id))
                     if leader_cal and follower_cal:
-                        ratio = calibrated_relative_ratio(leader_now[leader_id], leader_start[leader_id], leader_cal)
+                        ratio = calibrated_relative_ratio(leader_goal_raw, leader_start[leader_id], leader_cal)
                         bounded_ratio = clamp(ratio * gains[index] * invert[index], -1.0, 1.0)
                         wanted = calibrated_raw_from_ratio(bounded_ratio, follower_start[follower_id], follower_cal)
                     else:
-                        leader_delta = int(leader_now[leader_id]) - int(leader_start[leader_id])
+                        leader_delta = int(leader_goal_raw) - int(leader_start[leader_id])
                         bounded_delta = clamp(leader_delta * gains[index] * invert[index], -max_delta[index], max_delta[index])
                         wanted = int(round(int(follower_start[follower_id]) + bounded_delta))
                     if index == gripper_index and time.time() < gripper_hold_until:
@@ -1168,7 +1212,8 @@ class RawTeleopSession(object):
                         gripper_debug = {
                             "leader_start_raw": int(leader_start[leader_id]),
                             "follower_start_raw": int(follower_start[follower_id]),
-                            "leader_now_raw": int(leader_now[leader_id]),
+                            "leader_now_raw": int(leader_goal_raw),
+                            "leader_observed_raw": int(leader_now[leader_id]),
                             "wanted_raw": int(wanted),
                             "previous_goal_raw": int(previous),
                             "goal_raw": int(goal[follower_id]),
@@ -1194,7 +1239,7 @@ class RawTeleopSession(object):
                 with self.lock:
                     self.frames += 1
                     self.last_step_ms = now_ms()
-                    self.last_leader_raw = dict((int(k), int(v)) for k, v in leader_now.items())
+                    self.last_leader_raw = dict((int(k), int(v)) for k, v in filtered_leader_raw.items())
                     self.last_follower_raw = dict((int(k), int(v)) for k, v in follower_now.items())
                     self.last_goal_raw = dict((int(k), int(v)) for k, v in goal.items())
                     self.last_gripper_debug = dict(gripper_debug)
@@ -2490,7 +2535,8 @@ class DemoRuntime(object):
     def _save_recording_unlocked(self, name, points, delay):
         if not isinstance(points, list) or len(points) < 2:
             raise ValueError("recording requires at least 2 samples")
-        normalized_points = [normalize_manual_positions(point) for point in points]
+        smoothing_passes = int(clamp(int(self.serial_config.get("recording_smoothing_passes", 1)), 0, 4))
+        normalized_points = smooth_manual_position_points(points, smoothing_passes)
         delay = clamp(float(delay or 0.25), 0.05, 3.0)
         requested_name = str(name or "").strip()
         template_name = self._recording_template_name(requested_name) if requested_name else self._generated_recording_template_name()
