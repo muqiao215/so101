@@ -58,5 +58,41 @@
     "repeat": 1,
     "result": "ok",
     "error": ""
+  },
+  {
+    "ts_ms": 1782202731816,
+    "time": "2026-06-23 16:18:51",
+    "duration_ms": 45157,
+    "operator": "管理员",
+    "action_id": "action_product_action_9271043e",
+    "action_name": "右侧抓取",
+    "source_template": "record_20260527_093159",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782202798787,
+    "time": "2026-06-23 16:19:58",
+    "duration_ms": 59184,
+    "operator": "管理员",
+    "action_id": "action_product_action",
+    "action_name": "左侧抓取",
+    "source_template": "record_20260527_164641",
+    "repeat": 2,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782203064110,
+    "time": "2026-06-23 16:24:24",
+    "duration_ms": 85271,
+    "operator": "管理员",
+    "action_id": "action_maduo",
+    "action_name": "maduo",
+    "source_template": "record_teleop_20260623_162126",
+    "repeat": 2,
+    "result": "ok",
+    "error": ""
   }
 ]
