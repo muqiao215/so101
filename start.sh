@@ -5,10 +5,11 @@ DEMO_DIR="$(cd "$(dirname "${0}")/mint_follower_demo" && pwd)"
 LOG_DIR="$DEMO_DIR/logs"
 PID_FILE="/tmp/so101_monitor.pid"
 CONFIG_PATH="$DEMO_DIR/config/serial_config.json"
-PORT="$(python3 -c 'import json; print(json.load(open("'"$CONFIG_PATH"'")).get("http_port", 8765))' 2>/dev/null || echo 8765)"
-SERIAL_PORT="$(python3 -c 'import json; print(json.load(open("'"$CONFIG_PATH"'")).get("port", "/dev/ttyACM0"))' 2>/dev/null || echo /dev/ttyACM0)"
+PYTHON_BIN="$(command -v python3)"
+PORT="$("$PYTHON_BIN" -c 'import json; print(json.load(open("'"$CONFIG_PATH"'")).get("http_port", 8765))' 2>/dev/null || echo 8765)"
+SERIAL_PORT="$("$PYTHON_BIN" -c 'import json; print(json.load(open("'"$CONFIG_PATH"'")).get("port", "/dev/ttyACM0"))' 2>/dev/null || echo /dev/ttyACM0)"
 mapfile -t SERIAL_PORTS < <(
-    python3 -c '
+    "$PYTHON_BIN" -c '
 import json
 import glob
 
@@ -105,6 +106,7 @@ case "${1:-start}" in
         echo ""
         echo "  Frontend: http://127.0.0.1:$PORT"
         echo "  Log:      $LOG_DIR/"
+        echo "  Python:   $PYTHON_BIN"
         echo "  Mode:     监视 / 动作"
         echo ""
         echo "  每次启动会先关闭旧服务，然后启动新服务"
@@ -120,7 +122,7 @@ case "${1:-start}" in
 
         cd "$DEMO_DIR"
         trap cleanup EXIT INT TERM
-        python3 -u app.py &
+        "$PYTHON_BIN" -u app.py &
         SERVER_PID=$!
         echo "$SERVER_PID" > "$PID_FILE"
 
