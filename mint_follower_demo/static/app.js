@@ -117,6 +117,8 @@
   var businessRunLog = [];
   var editingProductActionId = '';
   var visionInspecting = false;
+  var pendingDeleteRecordingKey = '';
+  var pendingDeleteTemplateName = '';
 
   function addEvent(type, text) {
     var item = document.createElement('div');
@@ -1617,16 +1619,26 @@
       return;
     }
     var label = (rec.kind === 'file' ? '\u52A8\u4F5C ' : '\u6A21\u677F ') + (rec.display_name || rec.name) + ' (' + rec.samples + ' \u5E27)';
-    if (!window.confirm('\u5220\u9664\u6240\u9009\u5F55\u5236\uFF1F\n' + label)) {
+    var key = rec.kind + ':' + rec.id;
+    if (pendingDeleteRecordingKey !== key) {
+      pendingDeleteRecordingKey = key;
+      if (recordingDeleteBtn) recordingDeleteBtn.textContent = '确认删除';
+      addEvent('warn', '再次点击“确认删除”才会删除: ' + label);
       return;
     }
+    pendingDeleteRecordingKey = '';
+    if (recordingDeleteBtn) recordingDeleteBtn.textContent = '删除所选';
     api('POST', '/api/recording/delete', { kind: rec.kind, id: rec.id }).then(function (res) {
       if (!res) return;
       if (res.ok) {
         pendingRecordingSelection = '';
+        pendingDeleteRecordingKey = '';
+        if (recordingDeleteBtn) recordingDeleteBtn.textContent = '删除所选';
         addEvent('warn', '\u5DF2\u5220\u9664\u5F55\u5236: ' + label + (res.trashed_file ? ' / trash: ' + res.trashed_file : ''));
         refreshRecordingsAndTemplates('');
       } else {
+        pendingDeleteRecordingKey = '';
+        if (recordingDeleteBtn) recordingDeleteBtn.textContent = '删除所选';
         addEvent('error', '\u5220\u9664\u5931\u8D25: ' + (res.error || 'unknown'));
       }
     });
@@ -1756,15 +1768,21 @@
     templateRecords.sort(function (a, b) {
       return String(b.id || '').localeCompare(String(a.id || ''));
     });
+    var pendingStillExists = false;
+    for (var pendingIndex = 0; pendingIndex < templateRecords.length; pendingIndex++) {
+      if (templateRecords[pendingIndex].id === pendingDeleteTemplateName) pendingStillExists = true;
+    }
+    if (!pendingStillExists) pendingDeleteTemplateName = '';
     if (!templateRecords.length) {
       templateButtons.innerHTML = '<div class="template-empty">\u6682\u65E0\u5F55\u5236\u52A8\u4F5C</div>';
     } else {
       templateButtons.innerHTML = templateRecords.map(function (rec) {
         var label = rec.display_name || rec.name || rec.id;
+        var deleteLabel = pendingDeleteTemplateName === rec.id ? '确认' : 'x';
         return '<div class="template-item">' +
           '<button class="template-btn" data-template="' + escapeHtml(rec.id) + '">' + escapeHtml(label) + '</button>' +
           '<button class="template-rename-btn secondary" data-rename-template="' + escapeHtml(rec.id) + '" data-current-name="' + escapeHtml(label) + '" title="\u91CD\u547D\u540D">\u6539</button>' +
-          '<button class="template-delete-btn danger" data-delete-template="' + escapeHtml(rec.id) + '" title="\u5220\u9664">x</button>' +
+          '<button class="template-delete-btn danger" data-delete-template="' + escapeHtml(rec.id) + '" title="\u5220\u9664">' + deleteLabel + '</button>' +
           '</div>';
       }).join('');
     }
@@ -1814,15 +1832,22 @@
 
   function deleteTemplateByName(name) {
     if (!name) return;
-    if (!window.confirm('\u5220\u9664\u5F55\u5236\u52A8\u4F5C\uFF1F\n' + name)) {
+    if (pendingDeleteTemplateName !== name) {
+      pendingDeleteTemplateName = name;
+      renderTemplateLibrary();
+      addEvent('warn', '再次点击“确认”才会删除录制动作: ' + name);
       return;
     }
+    pendingDeleteTemplateName = '';
     api('POST', '/api/recording/delete', { kind: 'template', id: name }).then(function (res) {
       if (!res) return;
       if (res.ok) {
+        pendingDeleteTemplateName = '';
         addEvent('warn', '\u5DF2\u5220\u9664\u5F55\u5236\u52A8\u4F5C: ' + name);
         refreshRecordingsAndTemplates('');
       } else {
+        pendingDeleteTemplateName = '';
+        renderTemplateLibrary();
         addEvent('error', '\u5220\u9664\u5931\u8D25: ' + (res.error || 'unknown'));
       }
     });
@@ -2000,6 +2025,8 @@
     };
   }
   recordingSelect.onchange = function () {
+    pendingDeleteRecordingKey = '';
+    if (recordingDeleteBtn) recordingDeleteBtn.textContent = '删除所选';
     updateRecordingMeta();
     updateRecordingAvailability();
   };
