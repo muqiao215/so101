@@ -117,6 +117,7 @@
   var gripperMinCalibrationArm = 'follower';
   var loginRole = 'admin';
   var loginSession = null;
+  var loginRecords = [];
   var productActions = [];
   var businessRunLog = [];
   var editingProductActionId = '';
@@ -127,16 +128,18 @@
   var businessRunExpanded = false;
   var loginRecordsExpanded = false;
   var eventItems = [];
+  var COLLAPSED_LOG_LIMIT = 5;
+  var EXPANDED_LOG_LIMIT = 30;
 
   function addEvent(type, text) {
     eventItems.unshift({ type: type, text: text, time: new Date().toLocaleTimeString() });
-    while (eventItems.length > 20) eventItems.pop();
+    while (eventItems.length > EXPANDED_LOG_LIMIT) eventItems.pop();
     renderEvents();
   }
 
   function renderEvents() {
     if (!eventBox) return;
-    var rows = eventItems.slice(0, eventsExpanded ? 20 : 5);
+    var rows = eventItems.slice(0, eventsExpanded ? EXPANDED_LOG_LIMIT : COLLAPSED_LOG_LIMIT);
     if (!rows.length) {
       eventBox.innerHTML = '<div class="template-empty">暂无执行结果</div>';
     } else {
@@ -148,7 +151,7 @@
     }
     if (eventsToggleBtn) {
       eventsToggleBtn.textContent = eventsExpanded ? '收起' : '展开';
-      eventsToggleBtn.disabled = eventItems.length <= 5;
+      eventsToggleBtn.disabled = eventItems.length <= COLLAPSED_LOG_LIMIT;
     }
   }
 
@@ -261,20 +264,29 @@
 
   function renderLoginRecords(records) {
     if (!loginRecordsList) return;
+    if (records) loginRecords = records;
     setCollapsible(loginRecordsBody, loginRecordsToggleBtn, loginRecordsExpanded);
-    records = records || [];
-    if (!records.length) {
+    if (!loginRecords.length) {
       loginRecordsList.innerHTML = '<div class="template-empty">暂无登录记录</div>';
+      if (loginRecordsToggleBtn) loginRecordsToggleBtn.disabled = true;
       return;
     }
-    loginRecordsList.innerHTML = records.map(function (rec) {
+    var limit = loginRecordsExpanded ? EXPANDED_LOG_LIMIT : COLLAPSED_LOG_LIMIT;
+    var rows = loginRecords.slice(0, limit);
+    loginRecordsList.innerHTML = rows.map(function (rec) {
       var role = rec.role === 'employee' ? '员工' : '管理员';
       return '<div class="login-record">' +
         '<span>' + escapeHtml(rec.time || '-') + '</span>' +
         '<span class="role">' + escapeHtml(role) + '</span>' +
         '<span>' + escapeHtml(rec.operator || '-') + '</span>' +
         '</div>';
-    }).join('');
+    }).join('') + (loginRecords.length > limit
+      ? '<div class="compact-more">已显示最近 ' + limit + ' 条，共 ' + loginRecords.length + ' 条</div>'
+      : '');
+    if (loginRecordsToggleBtn) {
+      loginRecordsToggleBtn.textContent = loginRecordsExpanded ? '收起' : '展开';
+      loginRecordsToggleBtn.disabled = loginRecords.length <= COLLAPSED_LOG_LIMIT;
+    }
   }
 
   function loadLoginRecords() {
@@ -478,6 +490,19 @@
         samples: (templates[name] || []).length
       });
     });
+    productActions.forEach(function (action) {
+      var name = String(action.source_template || '');
+      if (name && templates[name] && !known[name]) {
+        records.push({
+          kind: 'template',
+          id: name,
+          name: name,
+          display_name: (action.name || name) + ' 资产模板',
+          samples: (templates[name] || []).length
+        });
+        known[name] = true;
+      }
+    });
     records.sort(function (a, b) {
       return String(b.id || '').localeCompare(String(a.id || ''));
     });
@@ -620,10 +645,11 @@
 
   function renderBusinessRunLog() {
     if (!businessRunLogList) return;
-    setCollapsible(businessRunLogList, businessRunToggleBtn, businessRunExpanded);
-    var rows = businessRunLog.slice(0, businessRunExpanded ? 30 : 5);
+    businessRunLogList.className = businessRunLogList.className.replace(/\s*\bhidden\b/g, '');
+    var rows = businessRunLog.slice(0, businessRunExpanded ? EXPANDED_LOG_LIMIT : COLLAPSED_LOG_LIMIT);
     if (!rows.length) {
       businessRunLogList.innerHTML = '<div class="template-empty">暂无业务执行记录</div>';
+      if (businessRunToggleBtn) businessRunToggleBtn.disabled = true;
       return;
     }
     businessRunLogList.innerHTML = rows.map(function (row) {
@@ -637,7 +663,13 @@
         '<span class="status-pill ' + cls + '">' + escapeHtml(result) + '</span>' +
         '<span>' + escapeHtml(row.error || '') + '</span>' +
         '</div>';
-    }).join('');
+    }).join('') + (businessRunLog.length > EXPANDED_LOG_LIMIT && businessRunExpanded
+      ? '<div class="compact-more">已显示最近 ' + EXPANDED_LOG_LIMIT + ' 条，共 ' + businessRunLog.length + ' 条</div>'
+      : '');
+    if (businessRunToggleBtn) {
+      businessRunToggleBtn.textContent = businessRunExpanded ? '收起' : '展开';
+      businessRunToggleBtn.disabled = businessRunLog.length <= COLLAPSED_LOG_LIMIT;
+    }
   }
 
   function renderProductActions() {

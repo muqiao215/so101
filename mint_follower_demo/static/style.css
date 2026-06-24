@@ -357,6 +357,12 @@ pre {
   margin-top: 14px;
 }
 
+.compact-more {
+  color: #6e6a61;
+  font-size: 12px;
+  padding: 4px 2px 0;
+}
+
 .login-record {
   display: grid;
   grid-template-columns: 160px 90px 1fr;
