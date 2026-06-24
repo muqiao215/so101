@@ -20,6 +20,7 @@ import threading
 import time
 import traceback
 import zlib
+import binascii
 
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -45,6 +46,9 @@ PRODUCT_ACTIONS_PATH = os.path.join(CONFIG_DIR, "product_actions.json")
 BUSINESS_RUN_LOG_PATH = os.path.join(CONFIG_DIR, "business_run_log.json")
 STATIC_DIR = os.path.join(ROOT, "static")
 LOG_DIR = os.path.join(ROOT, "logs")
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "1234"
+LOGIN_SESSIONS = {}
 JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
 MANUAL_LIMITS = {
     "shoulder_pan": (-math.pi, math.pi),
@@ -80,8 +84,29 @@ def read_json(path):
 
 
 def write_json(path, payload):
-    with open(path, "w") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
+    directory = os.path.dirname(path)
+    if directory and not os.path.isdir(directory):
+        os.makedirs(directory)
+    tmp_path = "%s.tmp.%d" % (path, os.getpid())
+    try:
+        with open(tmp_path, "w") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        if hasattr(os, "replace"):
+            os.replace(tmp_path, path)
+        else:
+            if os.path.exists(path):
+                os.remove(path)
+            os.rename(tmp_path, path)
+    except Exception:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+        raise
 
 
 def backup_file(path):
@@ -147,6 +172,42 @@ def append_login_record(role, operator_name, user_agent):
     records.append(record)
     save_login_records(records)
     return record
+
+
+def create_login_session(record):
+    token = binascii.hexlify(os.urandom(16)).decode("ascii")
+    LOGIN_SESSIONS[token] = {
+        "token": token,
+        "login_id": record["id"],
+        "role": record["role"],
+        "operator": record["operator"],
+        "created_ms": now_ms(),
+    }
+    return LOGIN_SESSIONS[token]
+
+
+def login_session_from_token(token):
+    token = str(token or "").strip()
+    if not token:
+        return None
+    return LOGIN_SESSIONS.get(token)
+
+
+def login_from_payload(body, user_agent):
+    body = body or {}
+    role = normalize_login_role(body.get("role", ""))
+    raw_operator = re.sub(r"\s+", " ", str(body.get("operator", "")).strip())
+    if role == "admin":
+        password = str(body.get("password", ""))
+        if raw_operator != ADMIN_USERNAME or password != ADMIN_PASSWORD:
+            raise ValueError("管理员账号或密码错误")
+        operator_name = "管理员"
+    else:
+        if not raw_operator:
+            raise ValueError("员工姓名不能为空")
+        operator_name = raw_operator[:80]
+    record = append_login_record(role, operator_name, user_agent)
+    return create_login_session(record), record
 
 
 def load_product_actions_payload():
@@ -2220,6 +2281,10 @@ class DemoRuntime(object):
         template_name = str(template_name or "").strip()
         if not template_name.startswith("record_"):
             raise ValueError("only recorded templates can be deleted")
+        references = self._product_action_template_references(template_name)
+        if references:
+            names = ", ".join([ref.get("name") or ref.get("id") or "-" for ref in references[:5]])
+            raise RuntimeError("该录制已被产品动作引用，不能删除: %s" % names)
         templates = self.templates.setdefault("templates", {})
         if template_name not in templates:
             return False
@@ -2282,6 +2347,7 @@ class DemoRuntime(object):
                 if new_filename != filename:
                     os.rename(path, new_path)
                 updated_files.append(new_filename)
+        self._move_product_action_template_references(old_name, new_name)
         return new_name, updated_files
 
     def _set_recording_template_display_name(self, template_name, display_name, update_files):
@@ -2366,12 +2432,27 @@ class DemoRuntime(object):
         removed_template = False
         trashed_files = []
         if kind == "template":
+            references = self._product_action_template_references(recording_id)
+            if references:
+                names = ", ".join([ref.get("name") or ref.get("id") or "-" for ref in references[:5]])
+                raise RuntimeError("该录制已被产品动作引用，不能删除: %s" % names)
             trashed_files = self._trash_recording_files_for_template(recording_id)
             removed_template = self._delete_recording_template(recording_id)
         else:
+            filename = os.path.basename(str(recording_id or "").strip())
+            if not filename.endswith(".json"):
+                raise ValueError("recording file id must be a json file")
+            path = os.path.join(RECORDINGS_DIR, filename)
+            if not os.path.isfile(path):
+                raise ValueError("recording file not found: %s" % filename)
+            payload = read_json(path)
+            template_name = payload.get("template", "")
+            references = self._product_action_template_references(template_name)
+            if references:
+                names = ", ".join([ref.get("name") or ref.get("id") or "-" for ref in references[:5]])
+                raise RuntimeError("该录制已被产品动作引用，不能删除: %s" % names)
             trashed_file, payload = self._trash_recording_file(recording_id)
             trashed_files = [trashed_file]
-            template_name = payload.get("template", "")
             if template_name.startswith("record_") and template_name in self.templates.get("templates", {}):
                 removed_template = self._delete_recording_template(template_name)
         with self.lock:
@@ -2654,9 +2735,50 @@ class DemoRuntime(object):
         action["optimized_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
         return execution_template, optimization
 
-    def list_product_actions(self):
+    def _product_action_template_references(self, template_name):
+        template_name = str(template_name or "").strip()
+        if not template_name:
+            return []
+        refs = []
+        payload = load_product_actions_payload()
+        for row in payload.get("actions", []):
+            if str(row.get("source_template", "")) == template_name or str(row.get("execution_template", "")) == template_name:
+                refs.append({
+                    "id": str(row.get("id", "")),
+                    "name": str(row.get("name", "")),
+                    "status": str(row.get("status", "")),
+                })
+        return refs
+
+    def _move_product_action_template_references(self, old_template, new_template):
+        old_template = str(old_template or "").strip()
+        new_template = str(new_template or "").strip()
+        if not old_template or not new_template or old_template == new_template:
+            return []
+        payload = load_product_actions_payload()
+        changed = []
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        for row in payload.get("actions", []):
+            if str(row.get("source_template", "")) == old_template:
+                row["source_template"] = new_template
+                row["updated_at"] = now
+                changed.append(row)
+        if changed:
+            save_product_actions_payload(payload)
+            self._log("product_action_template_reference_moved", {
+                "old_template": old_template,
+                "new_template": new_template,
+                "actions": [row.get("id", "") for row in changed],
+            })
+        return changed
+
+    def list_product_actions(self, session=None):
         payload = load_product_actions_payload()
         actions = sorted(payload.get("actions", []), key=lambda row: (str(row.get("status", "")), str(row.get("name", ""))))
+        is_admin = bool(session and session.get("role") == "admin")
+        if not is_admin:
+            actions = [row for row in actions if row.get("status") == "released"]
+            return {"ok": True, "actions": actions, "run_log": []}
         return {"ok": True, "actions": actions, "run_log": list(reversed(load_business_run_log()))[:100]}
 
     def save_product_action(self, body):
@@ -3236,6 +3358,25 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length).decode("utf-8")
         return json.loads(raw or "{}")
 
+    def _session(self):
+        return login_session_from_token(self.headers.get("X-Session-Token", ""))
+
+    def _require_login(self):
+        session = self._session()
+        if not session:
+            self._send_json({"ok": False, "error": "请先登录"}, status=401)
+            return None
+        return session
+
+    def _require_admin(self):
+        session = self._require_login()
+        if not session:
+            return None
+        if session.get("role") != "admin":
+            self._send_json({"ok": False, "error": "需要管理员登录"}, status=403)
+            return None
+        return session
+
     def do_GET(self):
         path = unquote(self.path.split("?", 1)[0])
         try:
@@ -3250,9 +3391,11 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/recordings":
                 self._send_json(RUNTIME.list_recordings())
             elif path == "/api/product-actions":
-                self._send_json(RUNTIME.list_product_actions())
+                self._send_json(RUNTIME.list_product_actions(self._session()))
             elif path == "/api/login-records":
-                self._send_json({"ok": True, "records": list(reversed(load_login_records()))})
+                session = self._require_admin()
+                if session:
+                    self._send_json({"ok": True, "records": list(reversed(load_login_records()))})
             elif path == "/api/teleop/calibration-health":
                 self._send_json(RUNTIME.check_teleop_calibration_health())
             elif path in ("", "/"):
@@ -3287,57 +3430,107 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/observation":
                 self._send_json(RUNTIME.read_observation())
             elif path == "/api/login":
-                record = append_login_record(body.get("role", ""), body.get("operator", ""), self.headers.get("User-Agent", ""))
-                self._send_json({"ok": True, "session": {"role": record["role"], "operator": record["operator"], "login_id": record["id"]}, "record": record})
-            elif path == "/api/login-records/clear":
-                save_login_records([])
-                self._send_json({"ok": True, "records": []})
-            elif path == "/api/teleop/scan":
-                self._send_json(RUNTIME.scan_leader(body.get("leader_port", ""), body.get("leader_ids", [])))
-            elif path == "/api/teleop/prepare-calibration":
-                self._send_json(RUNTIME.prepare_teleop_calibration())
-            elif path == "/api/teleop/calibrate":
-                self._send_json(RUNTIME.calibrate_teleop(body))
-            elif path == "/api/gripper/prepare-min":
-                self._send_json(RUNTIME.prepare_gripper_min_calibration(body))
-            elif path == "/api/gripper/save-min":
-                self._send_json(RUNTIME.save_gripper_min_calibration(body))
-            elif path == "/api/follower-gripper/prepare-min":
-                self._send_json(RUNTIME.prepare_follower_gripper_min_calibration())
-            elif path == "/api/follower-gripper/save-min":
-                self._send_json(RUNTIME.save_follower_gripper_min_calibration())
-            elif path == "/api/follower-gripper/close-test":
-                self._send_json(RUNTIME.test_follower_gripper_close(body))
-            elif path == "/api/teleop/start":
-                self._send_json(RUNTIME.start_teleop(body))
-            elif path == "/api/teleop/pause":
-                self._send_json(RUNTIME.pause_teleop())
-            elif path == "/api/teleop/resume":
-                self._send_json(RUNTIME.resume_teleop())
-            elif path == "/api/teleop/stop":
-                self._send_json(RUNTIME.stop_teleop())
-            elif path == "/api/control/initialize":
-                self._send_json(RUNTIME.initialize_control(body.get("positions", []), body.get("source", "current_observation")))
-            elif path == "/api/recording/save":
-                self._send_json(RUNTIME.save_recording(body.get("name", "recording"), body.get("points", []), body.get("delay", 0.25)))
-            elif path == "/api/recording/load":
-                self._send_json(RUNTIME.load_recording(body.get("id", "")))
-            elif path == "/api/recording/rename":
-                self._send_json(RUNTIME.rename_recording(body.get("kind", ""), body.get("id", ""), body.get("name", "")))
-            elif path == "/api/recording/delete":
-                self._send_json(RUNTIME.delete_recording(body.get("kind", ""), body.get("id", "")))
-            elif path == "/api/product-action/save":
-                self._send_json(RUNTIME.save_product_action(body))
-            elif path == "/api/product-action/status":
-                self._send_json(RUNTIME.update_product_action_status(body.get("id", ""), body.get("status", ""), body.get("operator", "")))
-            elif path == "/api/product-action/run":
-                self._send_json(RUNTIME.execute_product_action(body.get("id", ""), body.get("repeat", 1), body.get("operator", "")))
-            elif path == "/api/action":
-                if "positions" in body:
-                    self._send_json(RUNTIME.execute_positions(body.get("positions"), body.get("label", "manual_six_axis")))
+                try:
+                    session, record = login_from_payload(body, self.headers.get("User-Agent", ""))
+                except ValueError as exc:
+                    status = 401 if "密码" in str(exc) else 400
+                    self._send_json({"ok": False, "error": str(exc)}, status=status)
                 else:
-                    template = str(body.get("template", "")).strip()
-                    self._send_json(RUNTIME.execute_template(template, body.get("repeat", 1)))
+                    self._send_json({"ok": True, "session": session, "record": record})
+            elif path == "/api/login-records/clear":
+                session = self._require_admin()
+                if session:
+                    save_login_records([])
+                    self._send_json({"ok": True, "records": []})
+            elif path == "/api/teleop/scan":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.scan_leader(body.get("leader_port", ""), body.get("leader_ids", [])))
+            elif path == "/api/teleop/prepare-calibration":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.prepare_teleop_calibration())
+            elif path == "/api/teleop/calibrate":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.calibrate_teleop(body))
+            elif path == "/api/gripper/prepare-min":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.prepare_gripper_min_calibration(body))
+            elif path == "/api/gripper/save-min":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.save_gripper_min_calibration(body))
+            elif path == "/api/follower-gripper/prepare-min":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.prepare_follower_gripper_min_calibration())
+            elif path == "/api/follower-gripper/save-min":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.save_follower_gripper_min_calibration())
+            elif path == "/api/follower-gripper/close-test":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.test_follower_gripper_close(body))
+            elif path == "/api/teleop/start":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.start_teleop(body))
+            elif path == "/api/teleop/pause":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.pause_teleop())
+            elif path == "/api/teleop/resume":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.resume_teleop())
+            elif path == "/api/teleop/stop":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.stop_teleop())
+            elif path == "/api/control/initialize":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.initialize_control(body.get("positions", []), body.get("source", "current_observation")))
+            elif path == "/api/recording/save":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.save_recording(body.get("name", "recording"), body.get("points", []), body.get("delay", 0.25)))
+            elif path == "/api/recording/load":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.load_recording(body.get("id", "")))
+            elif path == "/api/recording/rename":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.rename_recording(body.get("kind", ""), body.get("id", ""), body.get("name", "")))
+            elif path == "/api/recording/delete":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.delete_recording(body.get("kind", ""), body.get("id", "")))
+            elif path == "/api/product-action/save":
+                session = self._require_admin()
+                if session:
+                    body["operator"] = session.get("operator", "")
+                    self._send_json(RUNTIME.save_product_action(body))
+            elif path == "/api/product-action/status":
+                session = self._require_admin()
+                if session:
+                    self._send_json(RUNTIME.update_product_action_status(body.get("id", ""), body.get("status", ""), session.get("operator", "")))
+            elif path == "/api/product-action/run":
+                session = self._require_login()
+                if session:
+                    self._send_json(RUNTIME.execute_product_action(body.get("id", ""), body.get("repeat", 1), session.get("operator", "")))
+            elif path == "/api/action":
+                session = self._require_admin()
+                if session:
+                    if "positions" in body:
+                        self._send_json(RUNTIME.execute_positions(body.get("positions"), body.get("label", "manual_six_axis")))
+                    else:
+                        template = str(body.get("template", "")).strip()
+                        self._send_json(RUNTIME.execute_template(template, body.get("repeat", 1)))
             else:
                 self._send_json({"ok": False, "error": "not found"}, status=404)
         except Exception as exc:

@@ -14,7 +14,10 @@
   var loginGate = document.getElementById('loginGate');
   var loginAdminTab = document.getElementById('loginAdminTab');
   var loginEmployeeTab = document.getElementById('loginEmployeeTab');
+  var loginNameLabel = document.getElementById('loginNameLabel');
   var loginNameInput = document.getElementById('loginNameInput');
+  var loginPasswordField = document.getElementById('loginPasswordField');
+  var loginPasswordInput = document.getElementById('loginPasswordInput');
   var loginEnterBtn = document.getElementById('loginEnterBtn');
   var loginRecordsPanel = document.getElementById('loginRecordsPanel');
   var loginRecordsList = document.getElementById('loginRecordsList');
@@ -77,7 +80,9 @@
   var productActionNoteInput = document.getElementById('productActionNoteInput');
   var productActionSaveBtn = document.getElementById('productActionSaveBtn');
   var productActionAdminList = document.getElementById('productActionAdminList');
+  var businessRunLogPanel = document.getElementById('businessRunLogPanel');
   var businessRunLogList = document.getElementById('businessRunLogList');
+  var maintenancePanels = document.querySelectorAll ? document.querySelectorAll('.maintenance-panel') : [];
 
   var JOINT_NAMES = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
   var JOINT_LABELS = ['\u5E95\u5EA7', '\u80A9\u90E8', '\u8098\u90E8', '\u8155\u4FEF\u4EF0', '\u8155\u65CB\u8F6C', '\u5939\u722A'];
@@ -126,9 +131,13 @@
       didAbort = true;
       if (controller) controller.abort();
     }, timeoutMs) : null;
+    var headers = { 'Content-Type': 'application/json' };
+    if (loginSession && loginSession.token) {
+      headers['X-Session-Token'] = loginSession.token;
+    }
     return fetch(url, {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller ? controller.signal : undefined
     }).then(function (res) {
@@ -167,12 +176,31 @@
     return String(value || '').replace(/\s+/g, ' ').trim();
   }
 
+  function setElementVisible(element, visible) {
+    if (!element) return;
+    var className = element.className || '';
+    var hasHidden = /\bhidden\b/.test(className);
+    if (visible && hasHidden) {
+      element.className = className.replace(/\s*\bhidden\b/g, '');
+    } else if (!visible && !hasHidden) {
+      element.className = className + ' hidden';
+    }
+  }
+
   function setLoginRole(role) {
     loginRole = role === 'employee' ? 'employee' : 'admin';
     if (loginAdminTab) loginAdminTab.className = loginRole === 'admin' ? 'active' : 'secondary';
     if (loginEmployeeTab) loginEmployeeTab.className = loginRole === 'employee' ? 'active' : 'secondary';
+    if (loginNameLabel) loginNameLabel.textContent = loginRole === 'admin' ? '管理员账号' : '员工姓名';
     if (loginNameInput) {
-      loginNameInput.placeholder = loginRole === 'admin' ? '例如 admin' : '例如 employee_01';
+      loginNameInput.placeholder = loginRole === 'admin' ? 'admin' : '例如 张三';
+      loginNameInput.autocomplete = loginRole === 'admin' ? 'username' : 'name';
+    }
+    if (loginPasswordField) {
+      loginPasswordField.className = 'login-field' + (loginRole === 'admin' ? '' : ' hidden');
+    }
+    if (loginPasswordInput) {
+      loginPasswordInput.value = '';
     }
   }
 
@@ -183,14 +211,18 @@
       operatorBadge.className = 'hardware-badge ' + (loginSession ? 'connected' : 'unknown');
       operatorBadge.textContent = loginSession ? (roleLabel + ': ' + name) : '未登录';
     }
-    if (loginRecordsPanel) {
-      loginRecordsPanel.className = 'panel admin-panel' + (loginSession && loginSession.role === 'admin' ? '' : ' hidden');
+    var isAdmin = !!(loginSession && loginSession.role === 'admin');
+    setElementVisible(loginRecordsPanel, isAdmin);
+    setElementVisible(productActionAdminPanel, isAdmin);
+    setElementVisible(businessRunLogPanel, isAdmin);
+    for (var i = 0; i < maintenancePanels.length; i++) {
+      setElementVisible(maintenancePanels[i], isAdmin);
     }
-    if (productActionAdminPanel) {
-      productActionAdminPanel.className = 'panel admin-panel' + (loginSession && loginSession.role === 'admin' ? '' : ' hidden');
-    }
-    if (loginSession && loginSession.role === 'admin') {
+    if (isAdmin) {
       loadLoginRecords();
+    }
+    if (loginSession) {
+      loadProductActions();
     }
   }
 
@@ -220,9 +252,11 @@
 
   function submitLogin() {
     var operatorName = normalizeDisplayName(loginNameInput && loginNameInput.value);
+    var password = loginPasswordInput ? loginPasswordInput.value : '';
     api('POST', '/api/login', {
       role: loginRole,
-      operator: operatorName
+      operator: operatorName,
+      password: password
     }).then(function (res) {
       if (!res) return;
       if (res.ok) {
@@ -1762,6 +1796,14 @@
 
   if (loginNameInput) {
     loginNameInput.onkeydown = function (event) {
+      if (event.key === 'Enter') {
+        submitLogin();
+      }
+    };
+  }
+
+  if (loginPasswordInput) {
+    loginPasswordInput.onkeydown = function (event) {
       if (event.key === 'Enter') {
         submitLogin();
       }

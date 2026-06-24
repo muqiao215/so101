@@ -94,5 +94,54 @@
     "repeat": 2,
     "result": "ok",
     "error": ""
+  },
+  {
+    "ts_ms": 1782265875989,
+    "time": "2026-06-24 09:51:15",
+    "duration_ms": 44123,
+    "operator": "管理员",
+    "action_id": "action_maduo",
+    "action_name": "maduo",
+    "source_template": "record_teleop_20260623_162126",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782266076707,
+    "time": "2026-06-24 09:54:36",
+    "duration_ms": 45000,
+    "operator": "管理员",
+    "action_id": "action_product_action_9271043e",
+    "action_name": "右侧抓取",
+    "source_template": "record_20260527_093159",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782267123900,
+    "time": "2026-06-24 10:12:03",
+    "duration_ms": 73876,
+    "operator": "管理员",
+    "action_id": "action_product_action_d6df2b3a",
+    "action_name": "沙包抓取",
+    "source_template": "record_20260624_100954",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782267406242,
+    "time": "2026-06-24 10:16:46",
+    "duration_ms": 97116,
+    "operator": "管理员",
+    "action_id": "action_product_action_d6df2b3a",
+    "action_name": "沙包抓取",
+    "source_template": "record_20260624_100954",
+    "execution_template": "product_product_action_d6df2b3a_exec",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
   }
 ]

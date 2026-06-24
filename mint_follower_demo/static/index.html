@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>SO101 Mint Follower Demo</title>
-  <link rel="stylesheet" href="/style.css?v=13">
+  <link rel="stylesheet" href="/style.css?v=15">
 </head>
 <body>
   <section id="loginGate" class="login-gate">
@@ -15,7 +15,8 @@
         <button type="button" id="loginAdminTab" class="active">管理员</button>
         <button type="button" id="loginEmployeeTab" class="secondary">员工</button>
       </div>
-      <label class="login-field">姓名/工号 <input id="loginNameInput" type="text" maxlength="80" autocomplete="name" placeholder="例如 operator_01"></label>
+      <label class="login-field"><span id="loginNameLabel">管理员账号</span><input id="loginNameInput" type="text" maxlength="80" autocomplete="username" placeholder="admin"></label>
+      <label id="loginPasswordField" class="login-field"><span>密码</span><input id="loginPasswordInput" type="password" maxlength="80" autocomplete="current-password" placeholder="1234"></label>
       <div class="login-actions">
         <button type="button" id="loginEnterBtn">进入控制台</button>
       </div>
@@ -47,7 +48,7 @@
       <p class="hero-footnote">停止会请求当前动作中断并释放力矩，不是物理急停；等待状态变为空闲后再开始新动作。</p>
     </section>
 
-    <section class="panel">
+    <section class="panel maintenance-panel hidden">
       <h2>实时关节位置 <span id="jointTimestamp"></span></h2>
       <div id="jointGrid" class="joint-grid"></div>
     </section>
@@ -83,12 +84,12 @@
       <div id="productActionAdminList" class="product-action-list"></div>
     </section>
 
-    <section class="panel">
+    <section id="businessRunLogPanel" class="panel admin-panel hidden">
       <h2>最近业务记录</h2>
       <div id="businessRunLogList" class="business-run-log"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel maintenance-panel hidden">
       <h2>时间段动作录制 <span id="recordHint"></span></h2>
       <div class="record-grid">
         <label>动作名称 <input id="recordNameInput" type="text" value="" placeholder="例如 inspection_sweep"></label>
@@ -102,7 +103,7 @@
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel maintenance-panel hidden">
       <h2>录制回放 <span id="playbackHint"></span></h2>
       <div class="playback-grid">
         <label>录制文件/模板 <select id="recordingSelect"></select></label>
@@ -120,7 +121,7 @@
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel maintenance-panel hidden">
       <h2>主从遥操作 <span id="teleopHint"></span></h2>
       <div class="teleop-grid">
         <label>主臂串口 <input id="leaderPortInput" type="text" value="/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00"></label>
@@ -146,7 +147,7 @@
       </div>
     </section>
 
-    <section class="grid">
+    <section class="grid maintenance-panel hidden">
       <article class="panel">
         <h2>录制动作库</h2>
         <div id="templateButtons" class="template-grid"></div>
@@ -158,18 +159,18 @@
       </article>
     </section>
 
-    <section class="panel status-panel">
+    <section class="panel status-panel maintenance-panel hidden">
       <h2>当前状态</h2>
       <dl id="statusGrid" class="status-grid status-grid-compact"></dl>
     </section>
 
-    <section class="panel">
+    <section class="panel maintenance-panel hidden">
       <h2>最后一次 Action</h2>
       <pre id="lastAction">{}</pre>
     </section>
 
     <section class="panel">
-      <h2>事件</h2>
+      <h2>执行结果</h2>
       <div id="events" class="events"></div>
     </section>
 
@@ -182,7 +183,7 @@
       <div id="loginRecordsList" class="login-records"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel maintenance-panel hidden">
       <h2>六轴手动控制 <span id="manualModeHint"></span></h2>
       <div id="manualControls" class="axis-controls"></div>
       <div class="manual-actions">
@@ -207,6 +208,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=36"></script>
+  <script src="/app.js?v=38"></script>
 </body>
 </html>

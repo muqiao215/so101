@@ -53,6 +53,10 @@ body {
   font-weight: 700;
 }
 
+.login-field + .login-field {
+  margin-top: 12px;
+}
+
 .login-field input {
   width: 100%;
   box-sizing: border-box;
