@@ -14,6 +14,7 @@ import os
 import platform
 import re
 import select
+import glob
 import subprocess
 import sys
 import threading
@@ -728,6 +729,68 @@ def load_config():
     return serial_config, templates, calibration
 
 
+def serial_port_candidates(preferred=None):
+    """Return stable serial paths first, then kernel-assigned fallback names."""
+    result = []
+
+    def add(path):
+        path = str(path or "").strip()
+        if path and path not in result:
+            result.append(path)
+
+    add(preferred)
+    for pattern in (
+        "/dev/serial/by-id/*",
+        "/dev/serial/by-path/*",
+        "/dev/ttyACM*",
+        "/dev/ttyUSB*",
+    ):
+        for path in sorted(glob.glob(pattern)):
+            add(path)
+    return result
+
+
+def probe_sts_port(serial_config, ids, port):
+    cfg = dict(serial_config)
+    cfg["port"] = port
+    cfg["scan_retries"] = min(int(cfg.get("scan_retries", 5)), 2)
+    cfg["scan_retry_delay_sec"] = min(float(cfg.get("scan_retry_delay_sec", 0.25)), 0.08)
+    cfg["scan_window_sec"] = min(float(cfg.get("scan_window_sec", 0) or 0), 1.2)
+    cfg["read_timeout_ms"] = min(int(cfg.get("read_timeout_ms", 150)), 80)
+    cfg["write_timeout_ms"] = min(int(cfg.get("write_timeout_ms", 150)), 80)
+    bus = NativeFeetechSTSBus(cfg)
+    try:
+        bus.connect()
+        time.sleep(min(float(cfg.get("serial_settle_sec", 0.2)), 0.2))
+        found = bus.scan_expected(ids)
+        wrong = dict((motor_id, model) for motor_id, model in found.items() if int(model) != STS_MODEL_NUMBER)
+        return {"ok": len(found) == len(ids) and not wrong, "port": port, "found": found, "wrong": wrong}
+    finally:
+        bus.disconnect()
+
+
+def detect_sts_port(serial_config, ids, preferred=None, exclude_ports=None):
+    exclude_ports = set([str(v) for v in (exclude_ports or []) if v])
+    attempts = []
+    for port in serial_port_candidates(preferred):
+        if port in exclude_ports:
+            continue
+        if os.name != "nt" and str(port).startswith("/") and not os.path.exists(port):
+            attempts.append({"port": port, "ok": False, "error": "not found"})
+            continue
+        if os.name != "nt" and str(port).startswith("/") and not os.access(port, os.R_OK | os.W_OK):
+            attempts.append({"port": port, "ok": False, "error": "permission denied"})
+            continue
+        try:
+            result = probe_sts_port(serial_config, ids, port)
+            attempts.append(result)
+            if result.get("ok"):
+                return {"ok": True, "port": port, "found": result.get("found", {}), "attempts": attempts}
+        except Exception as exc:
+            attempts.append({"port": port, "ok": False, "error": "%s: %s" % (type(exc).__name__, exc)})
+    return {"ok": False, "attempts": attempts}
+
+
 def ros_positions_to_lerobot_action(positions, mapping):
     scales = mapping.get("position_scales", {})
     offsets = mapping.get("position_offsets_deg", {})
@@ -1218,6 +1281,16 @@ class RawTeleopSession(object):
         cfg["backend"] = self.serial_config.get("leader_backend", self.serial_config.get("backend", "native_posix"))
         return cfg
 
+    def _resolve_leader_config(self, cfg, ids):
+        if bool(cfg.get("disable_auto_port_detect", False)):
+            return {}, cfg
+        detected = detect_sts_port(cfg, ids, cfg.get("port", ""), exclude_ports=[self.serial_config.get("port", "")])
+        if detected.get("ok"):
+            cfg = dict(cfg)
+            cfg["port"] = detected.get("port", cfg.get("port", ""))
+            self.serial_config["leader_port"] = cfg["port"]
+        return detected, cfg
+
     def is_active(self):
         with self.lock:
             return bool(self.running)
@@ -1248,6 +1321,7 @@ class RawTeleopSession(object):
         if port:
             cfg["port"] = port
         ids = parse_int_list(leader_ids, self._leader_ids())
+        detected, cfg = self._resolve_leader_config(cfg, ids)
         bus = NativeFeetechSTSBus(cfg)
         try:
             bus.connect()
@@ -1258,7 +1332,7 @@ class RawTeleopSession(object):
             for motor_id in ids:
                 if motor_id in found:
                     present[int(motor_id)] = bus.read_word(motor_id, STS_ADDR_PRESENT_POSITION)
-            return {"ok": not bool(missing), "found": found, "missing": missing, "present_raw": present}
+            return {"ok": not bool(missing), "found": found, "missing": missing, "present_raw": present, "leader_port": cfg.get("port", ""), "auto_detect": detected}
         finally:
             bus.disconnect()
 
@@ -1279,6 +1353,7 @@ class RawTeleopSession(object):
         leader_cfg = self._leader_config()
         if options.get("leader_port"):
             leader_cfg["port"] = options.get("leader_port")
+        detected, leader_cfg = self._resolve_leader_config(leader_cfg, leader_ids)
         leader_bus = NativeFeetechSTSBus(leader_cfg)
         try:
             leader_bus.connect()
@@ -1317,6 +1392,7 @@ class RawTeleopSession(object):
             "teleop_gains": parse_float_list(options.get("gains", self.serial_config.get("teleop_gains")), self._joint_count(), 1.0),
             "teleop_invert": parse_float_list(options.get("invert", self.serial_config.get("teleop_invert")), self._joint_count(), 1.0),
             "notes": "Put leader and follower into the same physical pose, then save this file. It is intended to be committed and migrated with the project.",
+            "auto_detect": detected,
         }
         write_json(TELEOP_CALIBRATION_PATH, payload)
         self.set_calibration(payload)
@@ -1406,6 +1482,7 @@ class RawTeleopSession(object):
         leader_cfg = self._leader_config()
         if options.get("leader_port"):
             leader_cfg["port"] = options.get("leader_port")
+        detected, leader_cfg = self._resolve_leader_config(leader_cfg, leader_ids)
         self.leader_bus = NativeFeetechSTSBus(leader_cfg)
         try:
             if self.follower_driver is None or not getattr(self.follower_driver, "connected", False):
@@ -1417,7 +1494,7 @@ class RawTeleopSession(object):
             found = self.leader_bus.scan_expected(leader_ids)
             missing = [motor_id for motor_id in leader_ids if motor_id not in found]
             if missing:
-                raise RuntimeError("主臂缺少 ID %s，found=%s" % (",".join([str(v) for v in missing]), found))
+                raise RuntimeError("主臂缺少 ID %s，found=%s auto_detect=%s" % (",".join([str(v) for v in missing]), found, detected))
             calibration_payload = self.teleop_calibration if bool(options.get("use_calibration", True)) else {}
             calibration_ok = bool(calibration_payload.get("calibrated"))
             if not calibration_ok:
@@ -2083,6 +2160,26 @@ class DemoRuntime(object):
     def _save_serial_config(self):
         write_json(os.path.join(CONFIG_DIR, "serial_config.json"), self.serial_config)
 
+    def _follower_ids(self):
+        return [int(self.calibration[name]["id"]) for name in JOINT_NAMES]
+
+    def _auto_detect_follower_port(self):
+        if bool(self.serial_config.get("disable_auto_port_detect", False)):
+            return {"ok": False, "disabled": True}
+        preferred = self.serial_config.get("port", "")
+        leader_port = self.serial_config.get("leader_port", "")
+        result = detect_sts_port(self.serial_config, self._follower_ids(), preferred, exclude_ports=[leader_port])
+        if result.get("ok") and result.get("port") != preferred:
+            old_port = preferred
+            self.serial_config["port"] = result.get("port")
+            self.state["port"] = self.serial_config["port"]
+            self._save_serial_config()
+            self.driver = self._make_driver()
+            self.teleop.serial_config = self.serial_config
+            result["old_port"] = old_port
+            result["saved"] = True
+        return result
+
     def set_mode(self, mode):
         mode = str(mode or "").strip().lower()
         if mode not in ("monitor", "action"):
@@ -2133,6 +2230,11 @@ class DemoRuntime(object):
         result["leader_port"] = port
         result["leader_ids"] = ids
         with self.lock:
+            detected_port = result.get("leader_port", "")
+            if detected_port and detected_port != self.serial_config.get("leader_port"):
+                self.serial_config["leader_port"] = detected_port
+                self.teleop.serial_config = self.serial_config
+                self._save_serial_config()
             self._log("leader_scanned", result)
         return result
 
@@ -3181,6 +3283,22 @@ class DemoRuntime(object):
             result = self.driver.connect()
         except Exception as exc:
             result = {"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}
+
+        auto_detect = {}
+        if not result.get("ok"):
+            with self.lock:
+                self.state["last_error"] = "配置串口连接失败，正在自动识别 SO101 串口..."
+            try:
+                auto_detect = self._auto_detect_follower_port()
+                if auto_detect.get("ok"):
+                    self._ensure_port_access()
+                    result = self.driver.connect()
+                    result["auto_detect"] = auto_detect
+                else:
+                    result["auto_detect"] = auto_detect
+            except Exception as exc:
+                auto_detect = {"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}
+                result["auto_detect"] = auto_detect
 
         with self.lock:
             self.state["connected"] = result.get("ok", False)
