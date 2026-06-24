@@ -95,6 +95,22 @@ H264: 640x480, 1280x720, 1920x1080 30fps
 
 Measured behavior on this machine: 1080p MJPG and 720p MJPG stream without read errors, but practical frame rate is about 25fps, not a steady 30fps.
 
+## Optional Visual Action Selection
+
+The product console includes a lightweight Visual Inspect button. It is intentionally not a live video stream.
+When clicked, the server opens the USB camera, warms up for a few frames, captures one 1280x720 MJPG frame, rotates it 180 degrees, detects the colored sandbags inside the table ROI, saves a static annotated JPEG, and releases the camera.
+
+Default station semantics:
+
+```text
+Right blue bag:   raw material zone
+Center yellow bag: processing zone
+Left purple bag: finished goods zone
+```
+
+The visual result only selects a released product action in the existing dropdown. It does not run the robot automatically.
+OpenCV is optional; without `python3-opencv`, the main console still starts, but Visual Inspect returns a dependency error.
+
 Preview 1080p MJPG:
 
 ```bash

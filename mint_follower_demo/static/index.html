@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>SO101 Mint Follower Demo</title>
-  <link rel="stylesheet" href="/style.css?v=15">
+  <link rel="stylesheet" href="/style.css?v=16">
 </head>
 <body>
   <section id="loginGate" class="login-gate">
@@ -61,9 +61,12 @@
         <div id="productActionMeta" class="record-count">未选择产品动作</div>
       </div>
       <div class="manual-actions">
+        <button id="visionInspectBtn" class="secondary">视觉识别</button>
         <button id="productActionRefreshBtn" class="secondary">刷新产品动作</button>
         <button id="productActionRunBtn">执行产品动作</button>
       </div>
+      <div id="visionResult" class="vision-result">视觉识别未运行</div>
+      <img id="visionSnapshot" class="vision-snapshot hidden" alt="视觉识别结果">
     </section>
 
     <section id="productActionAdminPanel" class="panel admin-panel hidden">
@@ -208,6 +211,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=38"></script>
+  <script src="/app.js?v=39"></script>
 </body>
 </html>

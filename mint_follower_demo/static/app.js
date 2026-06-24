@@ -71,6 +71,9 @@
   var productActionSelect = document.getElementById('productActionSelect');
   var productActionRepeatInput = document.getElementById('productActionRepeatInput');
   var productActionMeta = document.getElementById('productActionMeta');
+  var visionInspectBtn = document.getElementById('visionInspectBtn');
+  var visionResult = document.getElementById('visionResult');
+  var visionSnapshot = document.getElementById('visionSnapshot');
   var productActionRefreshBtn = document.getElementById('productActionRefreshBtn');
   var productActionRunBtn = document.getElementById('productActionRunBtn');
   var productActionAdminPanel = document.getElementById('productActionAdminPanel');
@@ -113,6 +116,7 @@
   var productActions = [];
   var businessRunLog = [];
   var editingProductActionId = '';
+  var visionInspecting = false;
 
   function addEvent(type, text) {
     var item = document.createElement('div');
@@ -485,8 +489,81 @@
     var action = selectedProductAction();
     var busy = !!(lastStatus && lastStatus.busy);
     if (productActionRunBtn) productActionRunBtn.disabled = busy || !action || !canPlayRecording();
+    if (visionInspectBtn) visionInspectBtn.disabled = busy || visionInspecting || !loginSession;
     if (productActionRefreshBtn) productActionRefreshBtn.disabled = busy;
     if (productActionSaveBtn) productActionSaveBtn.disabled = busy;
+  }
+
+  function visionZoneLabel(zone) {
+    if (zone === 'raw_zone') return '原料区';
+    if (zone === 'process_zone') return '加工区';
+    if (zone === 'finished_zone') return '成品区';
+    return '未识别';
+  }
+
+  function renderVisionResult(payload) {
+    if (!visionResult) return;
+    if (!payload || !payload.ok) {
+      visionResult.textContent = '视觉识别失败: ' + ((payload && payload.error) || 'unknown');
+      return;
+    }
+    var selected = payload.selected || null;
+    var parts = [];
+    if (selected) {
+      parts.push('识别: ' + visionZoneLabel(selected.zone));
+      parts.push((selected.color_label || selected.color || '-') + ' / 置信度 ' + selected.confidence);
+      parts.push('中心 ' + (selected.center_px || []).join(','));
+    } else {
+      parts.push('未识别到稳定沙包');
+    }
+    if (payload.recommended_action_name) {
+      parts.push('已选动作: ' + payload.recommended_action_name);
+    } else {
+      parts.push('未匹配到已发布动作');
+    }
+    visionResult.textContent = parts.join(' / ');
+    if (visionSnapshot && payload.annotated_image_url) {
+      visionSnapshot.src = payload.annotated_image_url;
+      visionSnapshot.className = 'vision-snapshot';
+    }
+  }
+
+  function selectProductActionById(id) {
+    if (!productActionSelect || !id) return false;
+    for (var i = 0; i < productActionSelect.options.length; i++) {
+      if (productActionSelect.options[i].value === id) {
+        productActionSelect.value = id;
+        updateProductActionMeta();
+        updateProductActionAvailability();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function inspectVision() {
+    if (visionInspecting) return;
+    visionInspecting = true;
+    if (visionResult) visionResult.textContent = '正在拍照识别...';
+    updateProductActionAvailability();
+    api('POST', '/api/vision/inspect', {}, 10000).then(function (res) {
+      if (!res) return;
+      renderVisionResult(res);
+      if (res.ok && res.recommended_action_id) {
+        if (selectProductActionById(res.recommended_action_id)) {
+          addEvent('ok', '视觉识别已选择动作: ' + (res.recommended_action_name || res.recommended_action_id));
+        } else {
+          addEvent('warn', '视觉识别有推荐动作，但当前列表中不可选: ' + res.recommended_action_id);
+        }
+      } else if (res.ok) {
+        addEvent('warn', '视觉识别完成，但没有匹配到已发布动作');
+      } else {
+        addEvent('error', '视觉识别失败: ' + (res.error || 'unknown'));
+      }
+    }).then(function () {
+      visionInspecting = false;
+      updateProductActionAvailability();
+    });
   }
 
   function renderProductActionSourceOptions() {
@@ -1937,6 +2014,7 @@
   recordingPlayBtn.onclick = playSelectedRecording;
   if (productActionRefreshBtn) productActionRefreshBtn.onclick = loadProductActions;
   if (productActionSelect) productActionSelect.onchange = updateProductActionMeta;
+  if (visionInspectBtn) visionInspectBtn.onclick = inspectVision;
   if (productActionRunBtn) productActionRunBtn.onclick = function () {
     var action = selectedProductAction();
     runProductAction(action && action.id);

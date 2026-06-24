@@ -23,6 +23,15 @@ import zlib
 import binascii
 
 try:
+    import cv2
+    import numpy as np
+    CV2_IMPORT_ERROR = ""
+except Exception as exc:  # pragma: no cover - optional vision dependency
+    cv2 = None
+    np = None
+    CV2_IMPORT_ERROR = "%s: %s" % (type(exc).__name__, exc)
+
+try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
     from socketserver import ThreadingMixIn
 except ImportError:  # pragma: no cover - Python 2 fallback
@@ -46,6 +55,9 @@ PRODUCT_ACTIONS_PATH = os.path.join(CONFIG_DIR, "product_actions.json")
 BUSINESS_RUN_LOG_PATH = os.path.join(CONFIG_DIR, "business_run_log.json")
 STATIC_DIR = os.path.join(ROOT, "static")
 LOG_DIR = os.path.join(ROOT, "logs")
+VISION_DIR = os.path.join(LOG_DIR, "vision")
+VISION_LATEST_IMAGE_PATH = os.path.join(VISION_DIR, "latest.jpg")
+VISION_LATEST_ANNOTATED_PATH = os.path.join(VISION_DIR, "latest_annotated.jpg")
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "1234"
 LOGIN_SESSIONS = {}
@@ -72,6 +84,52 @@ STS_INST_PING = 1
 STS_INST_READ = 2
 STS_INST_WRITE = 3
 STS_INST_SYNC_WRITE = 131
+VISION_DEFAULT_CAMERA = "/dev/v4l/by-id/usb-Clxet_UVCCamera_12345678-video-index0"
+VISION_DEFAULT_WIDTH = 1280
+VISION_DEFAULT_HEIGHT = 720
+VISION_DEFAULT_WARMUP_FRAMES = 30
+VISION_ROI = (80, 300, 1120, 390)
+VISION_TARGETS = [
+    {
+        "zone": "finished_zone",
+        "stage": "finished_ready",
+        "label": "成品区",
+        "draw_label": "finished",
+        "color": "purple",
+        "color_label": "紫色",
+        "hsv_low": (125, 35, 35),
+        "hsv_high": (172, 255, 255),
+        "draw_bgr": (255, 0, 255),
+    },
+    {
+        "zone": "process_zone",
+        "stage": "process_ready",
+        "label": "加工区",
+        "draw_label": "process",
+        "color": "yellow",
+        "color_label": "黄色",
+        "hsv_low": (18, 45, 70),
+        "hsv_high": (45, 255, 255),
+        "draw_bgr": (0, 220, 255),
+    },
+    {
+        "zone": "raw_zone",
+        "stage": "raw_ready",
+        "label": "原料区",
+        "draw_label": "raw",
+        "color": "blue",
+        "color_label": "蓝色",
+        "hsv_low": (90, 45, 45),
+        "hsv_high": (130, 255, 255),
+        "draw_bgr": (255, 80, 0),
+    },
+]
+VISION_STAGE_PRIORITY = ["raw_zone", "process_zone", "finished_zone"]
+VISION_ACTION_KEYWORDS = {
+    "raw_zone": ["原料上料", "原料", "上料", "加工阶段", "右侧", "右抓", "右", "raw_to_process", "raw"],
+    "process_zone": ["放置阶段", "成品下料", "下料", "加工", "中间", "沙包", "process_to_finished", "process"],
+    "finished_zone": ["成品", "完成", "左侧", "左抓", "左", "finished"],
+}
 
 
 def now_ms():
@@ -208,6 +266,170 @@ def login_from_payload(body, user_agent):
         operator_name = raw_operator[:80]
     record = append_login_record(role, operator_name, user_agent)
     return create_login_session(record), record
+
+
+def camera_source_for_cv2(source):
+    source = str(source or "").strip()
+    if source.isdigit():
+        return int(source)
+    real_source = os.path.realpath(source)
+    match = re.fullmatch(r"/dev/video(\d+)", real_source)
+    if match:
+        return int(match.group(1))
+    return source
+
+
+def ensure_vision_available():
+    if cv2 is None or np is None:
+        raise RuntimeError("视觉识别需要 python3-opencv: %s" % (CV2_IMPORT_ERROR or "cv2 unavailable"))
+
+
+def capture_vision_frame(camera, width, height, warmup_frames):
+    ensure_vision_available()
+    source = camera_source_for_cv2(camera)
+    cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
+    if not cap.isOpened():
+        raise RuntimeError("无法打开摄像头: %s" % camera)
+    try:
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(width))
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        frame = None
+        count = int(clamp(int(warmup_frames or 1), 1, 60))
+        for _index in range(count):
+            ok, next_frame = cap.read()
+            if ok and next_frame is not None:
+                frame = next_frame
+        if frame is None:
+            raise RuntimeError("摄像头没有返回画面")
+        return cv2.flip(frame, -1)
+    finally:
+        cap.release()
+
+
+def clamp_roi(roi, frame):
+    x, y, w, h = roi
+    height, width = frame.shape[:2]
+    x = max(0, min(int(x), width - 1))
+    y = max(0, min(int(y), height - 1))
+    w = max(1, min(int(w), width - x))
+    h = max(1, min(int(h), height - y))
+    return x, y, w, h
+
+
+def detect_colored_target(frame, target, roi):
+    ensure_vision_available()
+    frame_height, frame_width = frame.shape[:2]
+    x, y, w, h = roi
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, np.array(target["hsv_low"]), np.array(target["hsv_high"]))
+    roi_mask = np.zeros_like(mask)
+    roi_mask[y:y + h, x:x + w] = mask[y:y + h, x:x + w]
+    roi_mask = cv2.morphologyEx(roi_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8), iterations=1)
+    roi_mask = cv2.morphologyEx(roi_mask, cv2.MORPH_CLOSE, np.ones((13, 13), np.uint8), iterations=2)
+    contours, _hierarchy = cv2.findContours(roi_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    best = None
+    for contour in sorted(contours, key=cv2.contourArea, reverse=True):
+        area = float(cv2.contourArea(contour))
+        if area < 3500.0:
+            continue
+        bx, by, bw, bh = cv2.boundingRect(contour)
+        aspect = float(bw) / float(max(1, bh))
+        if aspect < 0.45 or aspect > 1.75:
+            continue
+        bbox_area = float(max(1, bw * bh))
+        bbox_pct = bbox_area / float(frame_width * frame_height)
+        area_pct = area / float(frame_width * frame_height)
+        if bbox_pct < 0.01 or bbox_pct > 0.24:
+            continue
+        color_fill = area / bbox_area
+        if color_fill < 0.35:
+            continue
+        center = [round(float(bx + bw / 2.0), 1), round(float(by + bh / 2.0), 1)]
+        confidence = min(0.99, 0.42 + min(0.30, color_fill * 0.30) + min(0.18, area_pct * 2.0) + min(0.09, max(0.0, 1.0 - abs(aspect - 1.0)) * 0.09))
+        best = {
+            "zone": target["zone"],
+            "stage": target["stage"],
+            "label": target["label"],
+            "draw_label": target["draw_label"],
+            "color": target["color"],
+            "color_label": target["color_label"],
+            "found": True,
+            "bbox": [int(bx), int(by), int(bw), int(bh)],
+            "center_px": center,
+            "area_px": round(area, 1),
+            "area_pct": round(area_pct * 100.0, 2),
+            "bbox_pct": round(bbox_pct * 100.0, 2),
+            "aspect": round(aspect, 3),
+            "color_fill": round(color_fill, 3),
+            "confidence": round(float(confidence), 3),
+        }
+        break
+    if best is not None:
+        return best
+    return {
+        "zone": target["zone"],
+        "stage": target["stage"],
+        "label": target["label"],
+        "draw_label": target["draw_label"],
+        "color": target["color"],
+        "color_label": target["color_label"],
+        "found": False,
+        "confidence": 0.0,
+    }
+
+
+def annotate_vision_frame(frame, roi, detections, selected_zone):
+    ensure_vision_available()
+    annotated = frame.copy()
+    x, y, w, h = roi
+    cv2.rectangle(annotated, (x, y), (x + w, y + h), (80, 255, 80), 2)
+    for target in VISION_TARGETS:
+        detection = None
+        for item in detections:
+            if item.get("zone") == target["zone"]:
+                detection = item
+                break
+        if not detection or not detection.get("found"):
+            continue
+        bx, by, bw, bh = detection["bbox"]
+        color = target["draw_bgr"]
+        thickness = 4 if detection.get("zone") == selected_zone else 2
+        cv2.rectangle(annotated, (bx, by), (bx + bw, by + bh), color, thickness)
+        cx, cy = detection.get("center_px", [bx + bw / 2.0, by + bh / 2.0])
+        cv2.circle(annotated, (int(cx), int(cy)), 6, color, -1)
+        text = "%s %s" % (detection.get("draw_label", ""), detection.get("confidence", ""))
+        cv2.putText(annotated, text, (bx, max(28, by - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2, cv2.LINE_AA)
+    return annotated
+
+
+def choose_vision_stage(detections):
+    found = [item for item in detections if item.get("found") and float(item.get("confidence", 0.0)) >= 0.62]
+    if not found:
+        return None
+    by_zone = dict((item["zone"], item) for item in found)
+    for zone in VISION_STAGE_PRIORITY:
+        if zone in by_zone:
+            return by_zone[zone]
+    return max(found, key=lambda item: float(item.get("confidence", 0.0)))
+
+
+def match_vision_product_action(zone, actions):
+    keywords = VISION_ACTION_KEYWORDS.get(zone, [])
+    released = [row for row in actions if row.get("status") == "released"]
+    for keyword in keywords:
+        key = str(keyword).lower()
+        for row in released:
+            haystack = " ".join([
+                str(row.get("name", "")),
+                str(row.get("id", "")),
+                str(row.get("source_template", "")),
+                str(row.get("note", "")),
+            ]).lower()
+            if key and key in haystack:
+                return row
+    return None
 
 
 def load_product_actions_payload():
@@ -2896,6 +3118,51 @@ class DemoRuntime(object):
                 "error": error,
             })
 
+    def inspect_vision(self, body):
+        body = body or {}
+        with self.lock:
+            if self.state.get("busy"):
+                raise RuntimeError("系统正在执行动作，等待空闲后再拍照识别")
+        camera = str(body.get("camera") or os.environ.get("SO101_VISION_CAMERA") or VISION_DEFAULT_CAMERA)
+        width = int(body.get("width") or os.environ.get("SO101_VISION_WIDTH") or VISION_DEFAULT_WIDTH)
+        height = int(body.get("height") or os.environ.get("SO101_VISION_HEIGHT") or VISION_DEFAULT_HEIGHT)
+        warmup_frames = int(body.get("warmup_frames") or os.environ.get("SO101_VISION_WARMUP_FRAMES") or VISION_DEFAULT_WARMUP_FRAMES)
+        started = now_ms()
+        frame = capture_vision_frame(camera, width, height, warmup_frames)
+        roi = clamp_roi(tuple(body.get("roi") or VISION_ROI), frame)
+        detections = [detect_colored_target(frame, target, roi) for target in VISION_TARGETS]
+        selected = choose_vision_stage(detections)
+        payload = load_product_actions_payload()
+        recommended_action = match_vision_product_action(selected.get("zone"), payload.get("actions", [])) if selected else None
+
+        if not os.path.isdir(VISION_DIR):
+            os.makedirs(VISION_DIR)
+        annotated = annotate_vision_frame(frame, roi, detections, selected.get("zone") if selected else "")
+        cv2.imwrite(VISION_LATEST_IMAGE_PATH, frame)
+        cv2.imwrite(VISION_LATEST_ANNOTATED_PATH, annotated)
+        response = {
+            "ok": True,
+            "camera": camera,
+            "width": int(frame.shape[1]),
+            "height": int(frame.shape[0]),
+            "roi": list(roi),
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "duration_ms": now_ms() - started,
+            "detections": detections,
+            "selected": selected,
+            "recommended_action_id": recommended_action.get("id", "") if recommended_action else "",
+            "recommended_action_name": recommended_action.get("name", "") if recommended_action else "",
+            "image_url": "/api/vision/latest.jpg?ts=%s" % now_ms(),
+            "annotated_image_url": "/api/vision/latest_annotated.jpg?ts=%s" % now_ms(),
+        }
+        self._log("vision_inspected", {
+            "selected_zone": selected.get("zone") if selected else "",
+            "recommended_action_id": response["recommended_action_id"],
+            "duration_ms": response["duration_ms"],
+            "detections": detections,
+        })
+        return response
+
     def connect(self, user_requested=True):
         with self.lock:
             if user_requested and self.state.get("busy"):
@@ -3398,6 +3665,16 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"ok": True, "records": list(reversed(load_login_records()))})
             elif path == "/api/teleop/calibration-health":
                 self._send_json(RUNTIME.check_teleop_calibration_health())
+            elif path == "/api/vision/latest.jpg":
+                if not os.path.isfile(VISION_LATEST_IMAGE_PATH):
+                    self._send_json({"ok": False, "error": "no vision image"}, status=404)
+                else:
+                    self._send_file(VISION_LATEST_IMAGE_PATH, "image/jpeg")
+            elif path == "/api/vision/latest_annotated.jpg":
+                if not os.path.isfile(VISION_LATEST_ANNOTATED_PATH):
+                    self._send_json({"ok": False, "error": "no vision image"}, status=404)
+                else:
+                    self._send_file(VISION_LATEST_ANNOTATED_PATH, "image/jpeg")
             elif path in ("", "/"):
                 self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
             elif path == "/app.js":
@@ -3523,6 +3800,10 @@ class Handler(BaseHTTPRequestHandler):
                 session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.execute_product_action(body.get("id", ""), body.get("repeat", 1), session.get("operator", "")))
+            elif path == "/api/vision/inspect":
+                session = self._require_login()
+                if session:
+                    self._send_json(RUNTIME.inspect_vision(body))
             elif path == "/api/action":
                 session = self._require_admin()
                 if session:
