@@ -913,6 +913,7 @@ class RawTeleopSession(object):
         self.last_follower_raw = {}
         self.last_goal_raw = {}
         self.last_gripper_debug = {}
+        self.last_joint_debug = {}
         self.last_step_ms = 0
         self.frames = 0
         self.recorded_points = []
@@ -954,6 +955,7 @@ class RawTeleopSession(object):
                 "last_follower_raw": dict(self.last_follower_raw),
                 "last_goal_raw": dict(self.last_goal_raw),
                 "last_gripper_debug": dict(self.last_gripper_debug),
+                "last_joint_debug": dict(self.last_joint_debug),
                 "last_step_ms": self.last_step_ms,
                 "calibration": dict(self.teleop_calibration),
             }
@@ -1099,27 +1101,25 @@ class RawTeleopSession(object):
             self._joint_count(),
             4.0,
         )
-        smoothing_alpha = clamp(
-            float(options.get("smoothing_alpha", self.serial_config.get("teleop_smoothing_alpha", 0.35))),
-            0.05,
-            1.0,
+        smoothing_alpha_raw = options.get(
+            "smoothing_alpha_by_joint",
+            options.get("smoothing_alpha", self.serial_config.get("teleop_smoothing_alpha_by_joint", self.serial_config.get("teleop_smoothing_alpha", 0.35))),
         )
+        if isinstance(smoothing_alpha_raw, (list, tuple)):
+            smoothing_alpha = [clamp(v, 0.05, 1.0) for v in parse_float_list(smoothing_alpha_raw, self._joint_count(), 0.35)]
+        else:
+            smoothing_alpha = [clamp(float(smoothing_alpha_raw), 0.05, 1.0)] * self._joint_count()
         max_delta = parse_float_list(
             options.get("max_delta_raw", self.serial_config.get("teleop_max_delta_raw")),
             self._joint_count(),
             480.0,
         )
         max_step_raw = clamp(float(options.get("max_step_raw", self.serial_config.get("teleop_max_step_raw", 12.0))), 2.0, 200.0)
-        # Per-joint step so all 6 axes cover the same fraction of their own range per cycle.
-        # Without this, a single raw-unit step is ~1.7x larger for the gripper than for the shoulder,
-        # making the gripper visibly out of sync with the other axes.
-        joint_ranges = []
-        for name in JOINT_NAMES:
-            rmin = int(self.calibration[name]["range_min"])
-            rmax = int(self.calibration[name]["range_max"])
-            joint_ranges.append(max(1, rmax - rmin))
-        max_range = max(joint_ranges)
-        per_joint_step = [max(1.0, max_step_raw * float(r) / float(max_range)) for r in joint_ranges]
+        step_raw_by_joint = options.get("step_raw_by_joint", self.serial_config.get("teleop_step_raw_by_joint"))
+        if step_raw_by_joint is not None:
+            per_joint_step = [clamp(v, 2.0, 200.0) for v in parse_float_list(step_raw_by_joint, self._joint_count(), max_step_raw)]
+        else:
+            per_joint_step = [max_step_raw] * self._joint_count()
         leader_cfg = self._leader_config()
         if options.get("leader_port"):
             leader_cfg["port"] = options.get("leader_port")
@@ -1185,6 +1185,7 @@ class RawTeleopSession(object):
                 leader_now = self.leader_bus.read_present_positions(leader_ids)
                 goal = {}
                 filtered_leader_raw = {}
+                joint_debug = {}
                 for index, follower_id in enumerate(follower_ids):
                     leader_id = leader_ids[index]
                     observed_leader_raw = float(leader_now[leader_id])
@@ -1192,7 +1193,7 @@ class RawTeleopSession(object):
                     if abs(observed_leader_raw - previous_filtered) <= float(deadband_raw[index]):
                         filtered_value = previous_filtered
                     else:
-                        filtered_value = previous_filtered + (observed_leader_raw - previous_filtered) * smoothing_alpha
+                        filtered_value = previous_filtered + (observed_leader_raw - previous_filtered) * smoothing_alpha[index]
                     filtered_leader[int(leader_id)] = filtered_value
                     leader_goal_raw = int(round(filtered_value))
                     filtered_leader_raw[int(leader_id)] = leader_goal_raw
@@ -1211,6 +1212,16 @@ class RawTeleopSession(object):
                     previous = int(current_goal[follower_id])
                     step = clamp(wanted - previous, -per_joint_step[index], per_joint_step[index])
                     goal[follower_id] = int(round(previous + step))
+                    joint_debug[JOINT_NAMES[index]] = {
+                        "leader_observed_raw": int(leader_now[leader_id]),
+                        "leader_filtered_raw": int(leader_goal_raw),
+                        "wanted_raw": int(wanted),
+                        "previous_goal_raw": int(previous),
+                        "goal_raw": int(goal[follower_id]),
+                        "deadband_raw": float(deadband_raw[index]),
+                        "smoothing_alpha": float(smoothing_alpha[index]),
+                        "step_limit_raw": float(per_joint_step[index]),
+                    }
                     if index == gripper_index:
                         gripper_debug = {
                             "leader_start_raw": int(leader_start[leader_id]),
@@ -1246,6 +1257,7 @@ class RawTeleopSession(object):
                     self.last_follower_raw = dict((int(k), int(v)) for k, v in follower_now.items())
                     self.last_goal_raw = dict((int(k), int(v)) for k, v in goal.items())
                     self.last_gripper_debug = dict(gripper_debug)
+                    self.last_joint_debug = dict(joint_debug)
                     self.last_error = ""
                 elapsed = time.time() - loop_start
                 wait = max(0.0, interval - elapsed)
