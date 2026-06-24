@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>SO101 Mint Follower Demo</title>
-  <link rel="stylesheet" href="/style.css?v=17">
+  <link rel="stylesheet" href="/style.css?v=18">
 </head>
 <body>
   <section id="loginGate" class="login-gate">
@@ -67,7 +67,10 @@
     </section>
 
     <section class="panel">
-      <h2>执行结果</h2>
+      <div class="panel-heading">
+        <h2>执行结果</h2>
+        <button id="eventsToggleBtn" class="secondary compact-toggle">展开</button>
+      </div>
       <div id="events" class="events"></div>
     </section>
 
@@ -92,17 +95,25 @@
     </section>
 
     <section id="businessRunLogPanel" class="panel admin-panel hidden">
-      <h2>最近业务记录</h2>
-      <div id="businessRunLogList" class="business-run-log"></div>
+      <div class="panel-heading">
+        <h2>最近业务记录</h2>
+        <button id="businessRunToggleBtn" class="secondary compact-toggle">展开</button>
+      </div>
+      <div id="businessRunLogList" class="business-run-log hidden"></div>
     </section>
 
     <section id="loginRecordsPanel" class="panel admin-panel hidden">
-      <h2>员工登录记录</h2>
-      <div class="manual-actions">
-        <button id="loginRecordsRefreshBtn" class="secondary">刷新记录</button>
-        <button id="loginRecordsClearBtn" class="danger">清空记录</button>
+      <div class="panel-heading">
+        <h2>员工登录记录</h2>
+        <button id="loginRecordsToggleBtn" class="secondary compact-toggle">展开</button>
       </div>
-      <div id="loginRecordsList" class="login-records"></div>
+      <div id="loginRecordsBody" class="panel-body hidden">
+        <div class="manual-actions">
+          <button id="loginRecordsRefreshBtn" class="secondary">刷新记录</button>
+          <button id="loginRecordsClearBtn" class="danger">清空记录</button>
+        </div>
+        <div id="loginRecordsList" class="login-records"></div>
+      </div>
     </section>
 
     <h2 class="section-title maintenance-panel hidden">设备调试与维护</h2>
@@ -217,6 +228,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=39"></script>
+  <script src="/app.js?v=40"></script>
 </body>
 </html>
