@@ -23,6 +23,8 @@
   var loginRecordsList = document.getElementById('loginRecordsList');
   var loginRecordsRefreshBtn = document.getElementById('loginRecordsRefreshBtn');
   var loginRecordsClearBtn = document.getElementById('loginRecordsClearBtn');
+  var loginRecordsToggleBtn = document.getElementById('loginRecordsToggleBtn');
+  var loginRecordsBody = document.getElementById('loginRecordsBody');
   var connectBtn = document.getElementById('connectBtn');
   var jointGrid = document.getElementById('jointGrid');
   var jointTimestamp = document.getElementById('jointTimestamp');
@@ -85,6 +87,8 @@
   var productActionAdminList = document.getElementById('productActionAdminList');
   var businessRunLogPanel = document.getElementById('businessRunLogPanel');
   var businessRunLogList = document.getElementById('businessRunLogList');
+  var businessRunToggleBtn = document.getElementById('businessRunToggleBtn');
+  var eventsToggleBtn = document.getElementById('eventsToggleBtn');
   var maintenancePanels = document.querySelectorAll ? document.querySelectorAll('.maintenance-panel') : [];
 
   var JOINT_NAMES = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
@@ -119,15 +123,38 @@
   var visionInspecting = false;
   var pendingDeleteRecordingKey = '';
   var pendingDeleteTemplateName = '';
+  var eventsExpanded = false;
+  var businessRunExpanded = false;
+  var loginRecordsExpanded = false;
+  var eventItems = [];
 
   function addEvent(type, text) {
-    var item = document.createElement('div');
-    item.className = 'event ' + type;
-    item.innerHTML = '<strong>' + new Date().toLocaleTimeString() + '</strong><span>' + text + '</span>';
-    eventBox.insertBefore(item, eventBox.firstChild);
-    while (eventBox.children.length > 20) {
-      eventBox.removeChild(eventBox.lastChild);
+    eventItems.unshift({ type: type, text: text, time: new Date().toLocaleTimeString() });
+    while (eventItems.length > 20) eventItems.pop();
+    renderEvents();
+  }
+
+  function renderEvents() {
+    if (!eventBox) return;
+    var rows = eventItems.slice(0, eventsExpanded ? 20 : 5);
+    if (!rows.length) {
+      eventBox.innerHTML = '<div class="template-empty">暂无执行结果</div>';
+    } else {
+      eventBox.innerHTML = rows.map(function (row) {
+        return '<div class="event ' + escapeHtml(row.type) + '">' +
+          '<strong>' + escapeHtml(row.time) + '</strong><span>' + escapeHtml(row.text) + '</span>' +
+          '</div>';
+      }).join('');
     }
+    if (eventsToggleBtn) {
+      eventsToggleBtn.textContent = eventsExpanded ? '收起' : '展开';
+      eventsToggleBtn.disabled = eventItems.length <= 5;
+    }
+  }
+
+  function setCollapsible(element, button, expanded) {
+    if (element) element.className = element.className.replace(/\s*\bhidden\b/g, '') + (expanded ? '' : ' hidden');
+    if (button) button.textContent = expanded ? '收起' : '展开';
   }
 
   function api(method, url, body, timeoutMs) {
@@ -234,6 +261,7 @@
 
   function renderLoginRecords(records) {
     if (!loginRecordsList) return;
+    setCollapsible(loginRecordsBody, loginRecordsToggleBtn, loginRecordsExpanded);
     records = records || [];
     if (!records.length) {
       loginRecordsList.innerHTML = '<div class="template-empty">暂无登录记录</div>';
@@ -592,7 +620,8 @@
 
   function renderBusinessRunLog() {
     if (!businessRunLogList) return;
-    var rows = businessRunLog.slice(0, 30);
+    setCollapsible(businessRunLogList, businessRunToggleBtn, businessRunExpanded);
+    var rows = businessRunLog.slice(0, businessRunExpanded ? 30 : 5);
     if (!rows.length) {
       businessRunLogList.innerHTML = '<div class="template-empty">暂无业务执行记录</div>';
       return;
@@ -1913,6 +1942,19 @@
   }
 
   if (loginRecordsRefreshBtn) loginRecordsRefreshBtn.onclick = loadLoginRecords;
+  if (eventsToggleBtn) eventsToggleBtn.onclick = function () {
+    eventsExpanded = !eventsExpanded;
+    renderEvents();
+  };
+  if (businessRunToggleBtn) businessRunToggleBtn.onclick = function () {
+    businessRunExpanded = !businessRunExpanded;
+    renderBusinessRunLog();
+  };
+  if (loginRecordsToggleBtn) loginRecordsToggleBtn.onclick = function () {
+    loginRecordsExpanded = !loginRecordsExpanded;
+    setCollapsible(loginRecordsBody, loginRecordsToggleBtn, loginRecordsExpanded);
+    if (loginRecordsExpanded) loadLoginRecords();
+  };
 
   if (loginRecordsClearBtn) loginRecordsClearBtn.onclick = function () {
     if (!window.confirm('清空所有登录记录？')) return;

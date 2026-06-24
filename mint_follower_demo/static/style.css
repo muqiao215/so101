@@ -87,6 +87,33 @@ body {
   padding: 24px;
 }
 
+.section-title {
+  margin: 22px 0 0;
+  font-size: 20px;
+  color: #2f4b3c;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-heading h2 {
+  margin: 0;
+}
+
+.compact-toggle {
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.compact-toggle:disabled {
+  display: none;
+}
+
 .hero-top {
   display: flex;
   gap: 20px;
