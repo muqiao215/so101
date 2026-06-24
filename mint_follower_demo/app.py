@@ -494,7 +494,7 @@ def normalize_manual_positions(positions):
     return normalized
 
 
-def smooth_manual_position_points(points, passes=1):
+def smooth_manual_position_points(points, passes=1, smooth_gripper=True):
     passes = int(clamp(int(passes or 0), 0, 4))
     smoothed = [normalize_manual_positions(point) for point in points]
     if passes <= 0 or len(smoothed) < 3:
@@ -504,6 +504,9 @@ def smooth_manual_position_points(points, passes=1):
         for index in range(1, len(smoothed) - 1):
             point = []
             for joint_index, name in enumerate(JOINT_NAMES):
+                if name == "gripper" and not smooth_gripper:
+                    point.append(smoothed[index][joint_index])
+                    continue
                 low, high = MANUAL_LIMITS[name]
                 value = (
                     smoothed[index - 1][joint_index] * 0.25
@@ -2557,6 +2560,85 @@ class DemoRuntime(object):
             self._log("recording_saved", {"template": template_name, "file": filename, "samples": len(normalized_points), "delay": delay})
         return {"ok": True, "template": template_name, "file": filename, "samples": len(normalized_points), "delay": delay}
 
+    def _template_points(self, template_name):
+        sequence = self.templates.get("templates", {}).get(template_name)
+        if not sequence:
+            raise ValueError("unknown template: %s" % template_name)
+        waypoints = self.templates.get("waypoints", {})
+        points = []
+        for waypoint_name in sequence:
+            positions = waypoints.get(waypoint_name)
+            if positions is None:
+                raise ValueError("missing waypoint: %s" % waypoint_name)
+            points.append(normalize_manual_positions(positions))
+        if len(points) < 2:
+            raise ValueError("template has fewer than 2 waypoints: %s" % template_name)
+        return points
+
+    def _positions_to_raw_goal(self, positions):
+        action = ros_positions_to_lerobot_action(normalize_manual_positions(positions), self.serial_config.get("mapping", {}))
+        return lerobot_action_to_raw_goal(action, self.calibration)
+
+    def _max_raw_delta(self, start_positions, target_positions):
+        start_raw = self._positions_to_raw_goal(start_positions)
+        target_raw = self._positions_to_raw_goal(target_positions)
+        return max(abs(int(target_raw[name]) - int(start_raw[name])) for name in JOINT_NAMES)
+
+    def _product_execution_template_name(self, action_id):
+        safe = re.sub(r"[^A-Za-z0-9_]+", "_", str(action_id or "product_action")).strip("_") or "product_action"
+        if safe.startswith("action_"):
+            safe = safe[len("action_"):]
+        return "product_%s_exec" % safe[:64]
+
+    def _build_optimized_execution_points(self, points, source_delay):
+        frame_delay = float(clamp(float(self.serial_config.get("published_action_frame_delay_sec", 0.08)), 0.03, 0.25))
+        max_step_raw = float(clamp(float(self.serial_config.get("published_action_max_step_raw", 32.0)), 4.0, 160.0))
+        max_segment_steps = int(clamp(int(self.serial_config.get("published_action_max_segment_steps", 32)), 1, 120))
+        smoothing_passes = int(clamp(int(self.serial_config.get("published_action_smoothing_passes", 2)), 0, 4))
+        base_points = smooth_manual_position_points(points, smoothing_passes, smooth_gripper=False)
+        optimized = [list(base_points[0])]
+        inserted = 0
+        for index in range(1, len(base_points)):
+            start = optimized[-1]
+            target = base_points[index]
+            raw_delta = self._max_raw_delta(start, target)
+            steps_by_distance = int(math.ceil(raw_delta / max_step_raw)) if raw_delta > 0 else 1
+            steps_by_time = int(math.ceil(float(source_delay) / frame_delay)) if source_delay > 0 else 1
+            steps = int(clamp(max(1, steps_by_distance, steps_by_time), 1, max_segment_steps))
+            for step_index in range(1, steps + 1):
+                ratio = float(step_index) / float(steps)
+                point = []
+                for joint_index, name in enumerate(JOINT_NAMES):
+                    low, high = MANUAL_LIMITS[name]
+                    value = start[joint_index] + (target[joint_index] - start[joint_index]) * ratio
+                    point.append(clamp(value, low, high))
+                optimized.append(point)
+            inserted += max(0, steps - 1)
+        return optimized, {
+            "frame_delay_sec": frame_delay,
+            "max_step_raw": max_step_raw,
+            "max_segment_steps": max_segment_steps,
+            "smoothing_passes": smoothing_passes,
+            "source_samples": len(points),
+            "execution_samples": len(optimized),
+            "inserted_frames": inserted,
+        }
+
+    def _ensure_product_execution_template(self, action):
+        action_id = str(action.get("id", "")).strip()
+        source_template = str(action.get("source_template", "")).strip()
+        if not action_id or not source_template:
+            raise ValueError("product action is missing id or source template")
+        points = self._template_points(source_template)
+        source_delay = float(self.templates.get("template_delays", {}).get(source_template, self.serial_config.get("command_step_delay_sec", 0.8)))
+        optimized_points, optimization = self._build_optimized_execution_points(points, source_delay)
+        execution_template = self._product_execution_template_name(action_id)
+        self._install_recording_template(execution_template, optimized_points, optimization["frame_delay_sec"])
+        action["execution_template"] = execution_template
+        action["optimization"] = optimization
+        action["optimized_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        return execution_template, optimization
+
     def list_product_actions(self):
         payload = load_product_actions_payload()
         actions = sorted(payload.get("actions", []), key=lambda row: (str(row.get("status", "")), str(row.get("name", ""))))
@@ -2602,6 +2684,9 @@ class DemoRuntime(object):
             "updated_by": operator,
             "updated_at": now,
         })
+        execution_template, optimization = self._ensure_product_execution_template(found)
+        found["execution_template"] = execution_template
+        found["optimization"] = optimization
         payload["actions"] = actions
         save_product_actions_payload(payload)
         self._log("product_action_saved", found)
@@ -2616,6 +2701,8 @@ class DemoRuntime(object):
                 row["status"] = status
                 row["updated_by"] = operator
                 row["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                if status == "released":
+                    self._ensure_product_execution_template(row)
                 save_product_actions_payload(payload)
                 self._log("product_action_status_changed", row)
                 return {"ok": True, "action": row}
@@ -2637,12 +2724,16 @@ class DemoRuntime(object):
             raise ValueError("product action not found: %s" % action_id)
         if action.get("status") != "released":
             raise RuntimeError("产品动作未发布，不能在员工执行区运行")
+        execution_template = str(action.get("execution_template", "")).strip()
+        if not execution_template or execution_template not in self.templates.get("templates", {}):
+            execution_template, _optimization = self._ensure_product_execution_template(action)
+            save_product_actions_payload(payload)
         operator = normalize_operator_name(operator, "employee")
         started = now_ms()
         result = "ok"
         error = ""
         try:
-            response = self.execute_template(action.get("source_template", ""), repeat)
+            response = self.execute_template(execution_template, repeat)
             if not response.get("ok"):
                 result = "stopped" if response.get("stopped") else "failed"
                 error = response.get("error", "")
@@ -2660,6 +2751,7 @@ class DemoRuntime(object):
                 "action_id": action.get("id", ""),
                 "action_name": action.get("name", ""),
                 "source_template": action.get("source_template", ""),
+                "execution_template": action.get("execution_template", ""),
                 "repeat": repeat,
                 "result": result,
                 "error": error,

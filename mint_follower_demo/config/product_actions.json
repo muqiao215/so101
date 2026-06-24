@@ -9,7 +9,18 @@
       "status": "released",
       "note": "",
       "updated_by": "管理员",
-      "updated_at": "2026-06-23 08:57:39"
+      "updated_at": "2026-06-23 08:57:39",
+      "execution_template": "product_product_action_exec",
+      "optimization": {
+        "frame_delay_sec": 0.08,
+        "max_step_raw": 32.0,
+        "max_segment_steps": 32,
+        "smoothing_passes": 2,
+        "source_samples": 110,
+        "execution_samples": 507,
+        "inserted_frames": 397
+      },
+      "optimized_at": "2026-06-24 09:57:40"
     },
     {
       "id": "action_product_action_899f2df7",
@@ -19,7 +30,18 @@
       "status": "released",
       "note": "",
       "updated_by": "管理员",
-      "updated_at": "2026-06-23 09:33:27"
+      "updated_at": "2026-06-23 09:33:27",
+      "execution_template": "product_product_action_899f2df7_exec",
+      "optimization": {
+        "frame_delay_sec": 0.08,
+        "max_step_raw": 32.0,
+        "max_segment_steps": 32,
+        "smoothing_passes": 2,
+        "source_samples": 58,
+        "execution_samples": 386,
+        "inserted_frames": 328
+      },
+      "optimized_at": "2026-06-24 09:57:40"
     },
     {
       "id": "action_product_action_9271043e",
@@ -29,7 +51,18 @@
       "status": "released",
       "note": "",
       "updated_by": "管理员",
-      "updated_at": "2026-06-23 14:56:51"
+      "updated_at": "2026-06-23 14:56:51",
+      "execution_template": "product_product_action_9271043e_exec",
+      "optimization": {
+        "frame_delay_sec": 0.08,
+        "max_step_raw": 32.0,
+        "max_segment_steps": 32,
+        "smoothing_passes": 2,
+        "source_samples": 165,
+        "execution_samples": 737,
+        "inserted_frames": 572
+      },
+      "optimized_at": "2026-06-24 09:57:40"
     },
     {
       "id": "action_maduo",
@@ -39,7 +72,18 @@
       "status": "released",
       "note": "",
       "updated_by": "管理员",
-      "updated_at": "2026-06-23 16:22:37"
+      "updated_at": "2026-06-23 16:22:37",
+      "execution_template": "product_maduo_exec",
+      "optimization": {
+        "frame_delay_sec": 0.08,
+        "max_step_raw": 32.0,
+        "max_segment_steps": 32,
+        "smoothing_passes": 2,
+        "source_samples": 161,
+        "execution_samples": 714,
+        "inserted_frames": 553
+      },
+      "optimized_at": "2026-06-24 09:57:40"
     }
   ]
 }

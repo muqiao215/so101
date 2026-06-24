@@ -438,8 +438,12 @@
     var parts = [
       productActionStatusLabel(action.status),
       action.source_template || '-',
+      action.execution_template ? ('执行 ' + action.execution_template) : '未补帧',
       action.updated_at || '-'
     ];
+    if (action.optimization && action.optimization.execution_samples) {
+      parts.splice(3, 0, '补帧 ' + action.optimization.source_samples + '->' + action.optimization.execution_samples);
+    }
     productActionMeta.textContent = parts.join(' / ');
   }
 
@@ -525,17 +529,21 @@
       } else {
         productActionAdminList.innerHTML = productActions.map(function (action) {
           var status = action.status || 'draft';
+          var opt = action.optimization || {};
+          var optimizationText = opt.execution_samples ? (' / 补帧 ' + opt.source_samples + '->' + opt.execution_samples + ' / ' + Number(opt.frame_delay_sec || 0).toFixed(2) + 's') : '';
+          var testTemplate = action.execution_template || action.source_template || '';
           return '<div class="product-action-card">' +
             '<div class="product-action-main">' +
               '<strong>' + escapeHtml(action.name || action.id) + '</strong>' +
               '<span class="status-pill ' + escapeHtml(status) + '">' + escapeHtml(productActionStatusLabel(status)) + '</span>' +
               '<span>来源: ' + escapeHtml(action.source_template || '-') + '</span>' +
+              '<span>执行: ' + escapeHtml(action.execution_template || '-') + escapeHtml(optimizationText) + '</span>' +
               '<span>更新: ' + escapeHtml(action.updated_by || '-') + ' / ' + escapeHtml(action.updated_at || '-') + '</span>' +
               '<small>' + escapeHtml(action.note || '') + '</small>' +
             '</div>' +
             '<div class="product-action-actions">' +
               '<button class="secondary" data-product-fill="' + escapeHtml(action.id) + '">填入</button>' +
-              '<button class="secondary" data-product-test="' + escapeHtml(action.source_template || '') + '">试运行</button>' +
+              '<button class="secondary" data-product-test="' + escapeHtml(testTemplate) + '">试运行</button>' +
               '<button data-product-status="released" data-product-id="' + escapeHtml(action.id) + '">发布</button>' +
               '<button class="secondary" data-product-status="draft" data-product-id="' + escapeHtml(action.id) + '">草稿</button>' +
               '<button class="danger" data-product-status="disabled" data-product-id="' + escapeHtml(action.id) + '">停用</button>' +
