@@ -2590,6 +2590,9 @@ class DemoRuntime(object):
             safe = safe[len("action_"):]
         return "product_%s_exec" % safe[:64]
 
+    def _auto_optimize_product_actions(self):
+        return bool(self.serial_config.get("auto_optimize_product_actions", True))
+
     def _build_optimized_execution_points(self, points, source_delay):
         frame_delay = float(clamp(float(self.serial_config.get("published_action_frame_delay_sec", 0.08)), 0.03, 0.25))
         max_step_raw = float(clamp(float(self.serial_config.get("published_action_max_step_raw", 32.0)), 4.0, 160.0))
@@ -2684,9 +2687,10 @@ class DemoRuntime(object):
             "updated_by": operator,
             "updated_at": now,
         })
-        execution_template, optimization = self._ensure_product_execution_template(found)
-        found["execution_template"] = execution_template
-        found["optimization"] = optimization
+        if self._auto_optimize_product_actions():
+            execution_template, optimization = self._ensure_product_execution_template(found)
+            found["execution_template"] = execution_template
+            found["optimization"] = optimization
         payload["actions"] = actions
         save_product_actions_payload(payload)
         self._log("product_action_saved", found)
@@ -2701,7 +2705,7 @@ class DemoRuntime(object):
                 row["status"] = status
                 row["updated_by"] = operator
                 row["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                if status == "released":
+                if status == "released" and self._auto_optimize_product_actions():
                     self._ensure_product_execution_template(row)
                 save_product_actions_payload(payload)
                 self._log("product_action_status_changed", row)
@@ -2724,16 +2728,17 @@ class DemoRuntime(object):
             raise ValueError("product action not found: %s" % action_id)
         if action.get("status") != "released":
             raise RuntimeError("产品动作未发布，不能在员工执行区运行")
-        execution_template = str(action.get("execution_template", "")).strip()
-        if not execution_template or execution_template not in self.templates.get("templates", {}):
+        execution_template = str(action.get("execution_template", "")).strip() if self._auto_optimize_product_actions() else ""
+        if self._auto_optimize_product_actions() and (not execution_template or execution_template not in self.templates.get("templates", {})):
             execution_template, _optimization = self._ensure_product_execution_template(action)
             save_product_actions_payload(payload)
+        run_template = execution_template or str(action.get("source_template", "")).strip()
         operator = normalize_operator_name(operator, "employee")
         started = now_ms()
         result = "ok"
         error = ""
         try:
-            response = self.execute_template(execution_template, repeat)
+            response = self.execute_template(run_template, repeat)
             if not response.get("ok"):
                 result = "stopped" if response.get("stopped") else "failed"
                 error = response.get("error", "")

@@ -60,6 +60,7 @@
   "max_relative_target_deg": 2.0,
   "command_step_delay_sec": 0.8,
   "recording_smoothing_passes": 1,
+  "auto_optimize_product_actions": true,
   "published_action_frame_delay_sec": 0.08,
   "published_action_max_step_raw": 32.0,
   "published_action_max_segment_steps": 32,
