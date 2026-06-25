@@ -88,47 +88,41 @@ VISION_DEFAULT_CAMERA = "/dev/v4l/by-id/usb-Clxet_UVCCamera_12345678-video-index
 VISION_DEFAULT_WIDTH = 1280
 VISION_DEFAULT_HEIGHT = 720
 VISION_DEFAULT_WARMUP_FRAMES = 30
-VISION_ROI = (80, 300, 1120, 390)
+VISION_ROI = (700, 340, 560, 340)
+VISION_MIN_CONFIDENCE = 0.62
+VISION_CONFLICT_MESSAGE = "视觉识别一次只能放置一种颜色目标，请移除多余目标后再识别"
 VISION_TARGETS = [
     {
-        "zone": "finished_zone",
-        "stage": "finished_ready",
-        "label": "成品区",
-        "draw_label": "finished",
-        "color": "purple",
-        "color_label": "紫色",
-        "hsv_low": (125, 35, 35),
-        "hsv_high": (172, 255, 255),
-        "draw_bgr": (255, 0, 255),
-    },
-    {
         "zone": "process_zone",
-        "stage": "process_ready",
-        "label": "加工区",
-        "draw_label": "process",
+        "stage": "yellow_ready",
+        "label": "黄色目标",
+        "draw_label": "yellow",
         "color": "yellow",
         "color_label": "黄色",
-        "hsv_low": (18, 45, 70),
-        "hsv_high": (45, 255, 255),
+        "hsv_low": (18, 60, 80),
+        "hsv_high": (42, 255, 255),
         "draw_bgr": (0, 220, 255),
     },
     {
         "zone": "raw_zone",
-        "stage": "raw_ready",
-        "label": "原料区",
-        "draw_label": "raw",
+        "stage": "blue_ready",
+        "label": "蓝色目标",
+        "draw_label": "blue",
         "color": "blue",
         "color_label": "蓝色",
-        "hsv_low": (90, 45, 45),
-        "hsv_high": (130, 255, 255),
+        "hsv_low": (96, 70, 50),
+        "hsv_high": (124, 255, 255),
         "draw_bgr": (255, 80, 0),
     },
 ]
-VISION_STAGE_PRIORITY = ["raw_zone", "process_zone", "finished_zone"]
+VISION_STAGE_PRIORITY = ["raw_zone", "process_zone"]
+VISION_ACTION_IDS = {
+    "raw_zone": "action_5",
+    "process_zone": "action_2_2",
+}
 VISION_ACTION_KEYWORDS = {
-    "raw_zone": ["原料上料", "原料", "上料", "加工阶段", "右侧", "右抓", "右", "raw_to_process", "raw"],
-    "process_zone": ["放置阶段", "成品下料", "下料", "加工", "中间", "沙包", "process_to_finished", "process"],
-    "finished_zone": ["成品", "完成", "左侧", "左抓", "左", "finished"],
+    "raw_zone": ["原材料5", "原材料", "动作一", "动作1", "蓝色", "blue", "action_5", "product_5_exec", "asset_raw_material_5_source"],
+    "process_zone": ["材料不合格2", "材料不合格", "动作二", "动作2", "黄色", "yellow", "action_2_2", "product_2_2_exec", "asset_material_ng_2_source"],
 }
 
 
@@ -199,6 +193,18 @@ def load_login_records():
 
 def save_login_records(records):
     write_json(LOGIN_RECORDS_PATH, list(records)[-2000:])
+
+
+def delete_login_record(record_id):
+    record_id = str(record_id or "").strip()
+    if not record_id:
+        raise ValueError("login record id is required")
+    records = load_login_records()
+    kept = [row for row in records if str(row.get("id", "")) != record_id]
+    if len(kept) == len(records):
+        raise ValueError("login record not found: %s" % record_id)
+    save_login_records(kept)
+    return kept
 
 
 def normalize_login_role(value):
@@ -405,7 +411,7 @@ def annotate_vision_frame(frame, roi, detections, selected_zone):
 
 
 def choose_vision_stage(detections):
-    found = [item for item in detections if item.get("found") and float(item.get("confidence", 0.0)) >= 0.62]
+    found = confident_vision_detections(detections)
     if not found:
         return None
     by_zone = dict((item["zone"], item) for item in found)
@@ -415,9 +421,19 @@ def choose_vision_stage(detections):
     return max(found, key=lambda item: float(item.get("confidence", 0.0)))
 
 
+def confident_vision_detections(detections):
+    return [item for item in detections if item.get("found") and float(item.get("confidence", 0.0)) >= VISION_MIN_CONFIDENCE]
+
+
 def match_vision_product_action(zone, actions):
-    keywords = VISION_ACTION_KEYWORDS.get(zone, [])
     released = [row for row in actions if row.get("status") == "released"]
+    fixed_id = VISION_ACTION_IDS.get(zone, "")
+    if fixed_id:
+        for row in released:
+            if str(row.get("id", "")) == fixed_id:
+                return row
+
+    keywords = VISION_ACTION_KEYWORDS.get(zone, [])
     for keyword in keywords:
         key = str(keyword).lower()
         for row in released:
@@ -425,6 +441,7 @@ def match_vision_product_action(zone, actions):
                 str(row.get("name", "")),
                 str(row.get("id", "")),
                 str(row.get("source_template", "")),
+                str(row.get("execution_template", "")),
                 str(row.get("note", "")),
             ]).lower()
             if key and key in haystack:
@@ -495,6 +512,43 @@ def append_business_run_log(row):
     rows = load_business_run_log()
     rows.append(dict(row or {}))
     write_json(BUSINESS_RUN_LOG_PATH, rows[-2000:])
+
+
+def business_run_log_id(row):
+    raw = "|".join([
+        str(row.get("ts_ms", "")),
+        str(row.get("time", "")),
+        str(row.get("operator", "")),
+        str(row.get("action_id", "")),
+        str(row.get("action_name", "")),
+        str(row.get("duration_ms", "")),
+    ])
+    return "run_%08x" % (zlib.crc32(raw.encode("utf-8")) & 0xFFFFFFFF)
+
+
+def business_run_log_rows_with_ids():
+    rows = []
+    for row in load_business_run_log():
+        item = dict(row or {})
+        item.setdefault("id", business_run_log_id(item))
+        rows.append(item)
+    return rows
+
+
+def save_business_run_log(rows):
+    write_json(BUSINESS_RUN_LOG_PATH, list(rows)[-2000:])
+
+
+def delete_business_run_log_record(record_id):
+    record_id = str(record_id or "").strip()
+    if not record_id:
+        raise ValueError("business run record id is required")
+    rows = business_run_log_rows_with_ids()
+    kept = [row for row in rows if str(row.get("id", "")) != record_id]
+    if len(kept) == len(rows):
+        raise ValueError("business run record not found: %s" % record_id)
+    save_business_run_log(kept)
+    return kept
 
 
 def clamp(value, low, high):
@@ -2994,6 +3048,27 @@ class DemoRuntime(object):
             })
         return changed
 
+    def _remove_product_action_template_references(self, template_name):
+        template_name = str(template_name or "").strip()
+        if not template_name:
+            return []
+        payload = load_product_actions_payload()
+        kept = []
+        removed = []
+        for row in payload.get("actions", []):
+            if str(row.get("source_template", "")) == template_name or str(row.get("execution_template", "")) == template_name:
+                removed.append(row)
+            else:
+                kept.append(row)
+        if removed:
+            payload["actions"] = kept
+            save_product_actions_payload(payload)
+            self._log("product_action_template_references_removed", {
+                "template": template_name,
+                "actions": [row.get("id", "") for row in removed],
+            })
+        return removed
+
     def list_product_actions(self, session=None):
         payload = load_product_actions_payload()
         actions = sorted(payload.get("actions", []), key=lambda row: (str(row.get("status", "")), str(row.get("name", ""))))
@@ -3001,7 +3076,7 @@ class DemoRuntime(object):
         if not is_admin:
             actions = [row for row in actions if row.get("status") == "released"]
             return {"ok": True, "actions": actions, "run_log": []}
-        return {"ok": True, "actions": actions, "run_log": list(reversed(load_business_run_log()))[:100]}
+        return {"ok": True, "actions": actions, "run_log": list(reversed(business_run_log_rows_with_ids()))[:100]}
 
     def save_product_action(self, body):
         body = body or {}
@@ -3068,6 +3143,57 @@ class DemoRuntime(object):
                 return {"ok": True, "action": row}
         raise ValueError("product action not found: %s" % action_id)
 
+    def delete_product_action(self, action_id, operator):
+        action_id = str(action_id or "").strip()
+        if not action_id:
+            raise ValueError("product action id is required")
+        operator = normalize_operator_name(operator, "admin")
+        with self.lock:
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能删除产品动作")
+        payload = load_product_actions_payload()
+        actions = payload.get("actions", [])
+        kept = []
+        deleted = None
+        for row in actions:
+            if str(row.get("id", "")) == action_id:
+                deleted = row
+            else:
+                kept.append(row)
+        if deleted is None:
+            raise ValueError("product action not found: %s" % action_id)
+        payload["actions"] = kept
+        save_product_actions_payload(payload)
+        self._log("product_action_deleted", {
+            "id": action_id,
+            "name": deleted.get("name", ""),
+            "operator": operator,
+        })
+        return {"ok": True, "deleted": deleted}
+
+    def delete_business_run_record(self, record_id):
+        with self.lock:
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能删除业务记录")
+        record_id = str(record_id or "").strip()
+        if not record_id:
+            raise ValueError("business run record id is required")
+        rows = business_run_log_rows_with_ids()
+        kept = [row for row in rows if str(row.get("id", "")) != record_id]
+        if len(kept) == len(rows):
+            raise ValueError("business run record not found: %s" % record_id)
+        save_business_run_log(kept)
+        self._log("business_run_record_deleted", {"id": record_id})
+        return {"ok": True, "id": record_id}
+
+    def clear_business_run_records(self):
+        with self.lock:
+            if self.state.get("busy"):
+                raise RuntimeError("执行中不能清空业务记录")
+        save_business_run_log([])
+        self._log("business_run_records_cleared", {})
+        return {"ok": True, "records": []}
+
     def execute_product_action(self, action_id, repeat, operator):
         try:
             repeat = int(repeat)
@@ -3131,7 +3257,9 @@ class DemoRuntime(object):
         frame = capture_vision_frame(camera, width, height, warmup_frames)
         roi = clamp_roi(tuple(body.get("roi") or VISION_ROI), frame)
         detections = [detect_colored_target(frame, target, roi) for target in VISION_TARGETS]
-        selected = choose_vision_stage(detections)
+        confident = confident_vision_detections(detections)
+        conflict = len(confident) > 1
+        selected = None if conflict else choose_vision_stage(detections)
         payload = load_product_actions_payload()
         recommended_action = match_vision_product_action(selected.get("zone"), payload.get("actions", [])) if selected else None
 
@@ -3149,17 +3277,75 @@ class DemoRuntime(object):
             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "duration_ms": now_ms() - started,
             "detections": detections,
+            "confident_detections": confident,
+            "target_count": len(confident),
+            "conflict": conflict,
             "selected": selected,
             "recommended_action_id": recommended_action.get("id", "") if recommended_action else "",
             "recommended_action_name": recommended_action.get("name", "") if recommended_action else "",
+            "message": VISION_CONFLICT_MESSAGE if conflict else "",
             "image_url": "/api/vision/latest.jpg?ts=%s" % now_ms(),
             "annotated_image_url": "/api/vision/latest_annotated.jpg?ts=%s" % now_ms(),
         }
         self._log("vision_inspected", {
             "selected_zone": selected.get("zone") if selected else "",
             "recommended_action_id": response["recommended_action_id"],
+            "conflict": conflict,
+            "target_count": len(confident),
             "duration_ms": response["duration_ms"],
             "detections": detections,
+        })
+        return response
+
+    def execute_vision_action(self, body, operator):
+        body = body or {}
+        repeat = body.get("repeat", 1)
+        response = self.inspect_vision(body)
+        response["executed"] = False
+        response["action_response"] = None
+
+        if response.get("conflict"):
+            response["message"] = VISION_CONFLICT_MESSAGE
+            self._log("vision_action_skipped", {"reason": "conflict", "detections": response.get("confident_detections", [])})
+            return response
+
+        selected = response.get("selected") or {}
+        if not selected:
+            response["message"] = "未识别到符合要求的蓝色或黄色目标，等待下一次识别"
+            self._log("vision_action_skipped", {"reason": "no_target", "detections": response.get("detections", [])})
+            return response
+
+        action_id = str(response.get("recommended_action_id", "")).strip()
+        if not action_id:
+            response["message"] = "识别到%s，但没有匹配到已发布产品动作" % (selected.get("color_label") or selected.get("color") or "目标")
+            self._log("vision_action_skipped", {"reason": "no_action", "selected": selected})
+            return response
+
+        try:
+            action_response = self.execute_product_action(action_id, repeat, operator)
+        except Exception as exc:
+            response["ok"] = False
+            response["message"] = "视觉识别已匹配动作，但执行失败"
+            response["error"] = "%s: %s" % (type(exc).__name__, exc)
+            self._log("vision_action_failed", {
+                "action_id": action_id,
+                "selected": selected,
+                "error": response["error"],
+            })
+            return response
+
+        response["action_response"] = action_response
+        response["executed"] = bool(action_response.get("ok"))
+        response["message"] = "已执行视觉匹配动作: %s" % (response.get("recommended_action_name") or action_id)
+        if not action_response.get("ok"):
+            response["ok"] = False
+            response["error"] = action_response.get("error", "action failed")
+            response["message"] = "视觉匹配动作执行未完成"
+        self._log("vision_action_executed", {
+            "action_id": action_id,
+            "action_name": response.get("recommended_action_name", ""),
+            "selected": selected,
+            "executed": response["executed"],
         })
         return response
 
@@ -3804,6 +3990,10 @@ class Handler(BaseHTTPRequestHandler):
                 session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.inspect_vision(body))
+            elif path == "/api/vision/run":
+                session = self._require_login()
+                if session:
+                    self._send_json(RUNTIME.execute_vision_action(body, session.get("operator", "")))
             elif path == "/api/action":
                 session = self._require_admin()
                 if session:

@@ -122,6 +122,11 @@
   var businessRunLog = [];
   var editingProductActionId = '';
   var visionInspecting = false;
+  var visionAutoRunning = false;
+  var visionAutoTimer = null;
+  var visionAutoDueAt = 0;
+  var visionAutoTickTimer = null;
+  var visionAutoBaseText = '视觉识别未运行';
   var pendingDeleteRecordingKey = '';
   var pendingDeleteTemplateName = '';
   var eventsExpanded = false;
@@ -130,6 +135,7 @@
   var eventItems = [];
   var COLLAPSED_LOG_LIMIT = 5;
   var EXPANDED_LOG_LIMIT = 30;
+  var VISION_AUTO_INTERVAL_MS = 12000;
 
   function addEvent(type, text) {
     eventItems.unshift({ type: type, text: text, time: new Date().toLocaleTimeString() });
@@ -544,14 +550,17 @@
     var action = selectedProductAction();
     var busy = !!(lastStatus && lastStatus.busy);
     if (productActionRunBtn) productActionRunBtn.disabled = busy || !action || !canPlayRecording();
-    if (visionInspectBtn) visionInspectBtn.disabled = busy || visionInspecting || !loginSession;
+    if (visionInspectBtn) {
+      visionInspectBtn.disabled = !loginSession || (!visionAutoRunning && (busy || visionInspecting));
+      visionInspectBtn.textContent = visionAutoRunning ? '停止视觉自动执行' : '视觉自动执行';
+    }
     if (productActionRefreshBtn) productActionRefreshBtn.disabled = busy;
     if (productActionSaveBtn) productActionSaveBtn.disabled = busy;
   }
 
   function visionZoneLabel(zone) {
-    if (zone === 'raw_zone') return '原料区';
-    if (zone === 'process_zone') return '加工区';
+    if (zone === 'raw_zone') return '蓝色目标';
+    if (zone === 'process_zone') return '黄色目标';
     if (zone === 'finished_zone') return '成品区';
     return '未识别';
   }
@@ -559,28 +568,160 @@
   function renderVisionResult(payload) {
     if (!visionResult) return;
     if (!payload || !payload.ok) {
-      visionResult.textContent = '视觉识别失败: ' + ((payload && payload.error) || 'unknown');
+      setVisionResultText('视觉识别失败: ' + ((payload && payload.error) || 'unknown'));
       return;
     }
     var selected = payload.selected || null;
     var parts = [];
-    if (selected) {
+    if (payload.conflict) {
+      parts.push(payload.message || '视觉识别一次只能放置一种颜色目标');
+      if (payload.target_count) parts.push('当前检测到 ' + payload.target_count + ' 种目标');
+    } else if (selected) {
       parts.push('识别: ' + visionZoneLabel(selected.zone));
       parts.push((selected.color_label || selected.color || '-') + ' / 置信度 ' + selected.confidence);
       parts.push('中心 ' + (selected.center_px || []).join(','));
     } else {
       parts.push('未识别到稳定沙包');
     }
-    if (payload.recommended_action_name) {
+    if (payload.conflict) {
+      parts.push('未执行动作');
+    } else if (payload.recommended_action_name) {
       parts.push('已选动作: ' + payload.recommended_action_name);
     } else {
       parts.push('未匹配到已发布动作');
     }
-    visionResult.textContent = parts.join(' / ');
+    if (payload.executed) {
+      parts.push('已直接执行');
+    } else if (payload.message && !payload.conflict) {
+      parts.push(payload.message);
+    }
+    setVisionResultText(parts.join(' / '));
     if (visionSnapshot && payload.annotated_image_url) {
       visionSnapshot.src = payload.annotated_image_url;
       visionSnapshot.className = 'vision-snapshot';
     }
+  }
+
+  function setVisionResultText(text) {
+    visionAutoBaseText = text || '';
+    updateVisionAutoCountdown();
+  }
+
+  function updateVisionAutoCountdown() {
+    if (!visionResult) return;
+    var text = visionAutoBaseText || '';
+    if (visionAutoRunning && visionAutoDueAt && !visionInspecting) {
+      var seconds = Math.max(0, Math.ceil((visionAutoDueAt - Date.now()) / 1000));
+      text += ' / 下次识别约 ' + seconds + ' 秒';
+    }
+    visionResult.textContent = text;
+  }
+
+  function clearVisionAutoTimer() {
+    if (visionAutoTimer) {
+      clearTimeout(visionAutoTimer);
+      visionAutoTimer = null;
+    }
+    visionAutoDueAt = 0;
+  }
+
+  function startVisionAutoTick() {
+    if (visionAutoTickTimer) return;
+    visionAutoTickTimer = setInterval(updateVisionAutoCountdown, 1000);
+  }
+
+  function stopVisionAutoTick() {
+    if (!visionAutoTickTimer) return;
+    clearInterval(visionAutoTickTimer);
+    visionAutoTickTimer = null;
+  }
+
+  function scheduleVisionAutoNext(delayMs) {
+    clearVisionAutoTimer();
+    if (!visionAutoRunning) return;
+    var delay = Math.max(3000, Number(delayMs || VISION_AUTO_INTERVAL_MS));
+    visionAutoDueAt = Date.now() + delay;
+    updateVisionAutoCountdown();
+    visionAutoTimer = setTimeout(runVisionAutoCycle, delay);
+  }
+
+  function startVisionAuto() {
+    if (visionAutoRunning) return;
+    if (!loginSession) {
+      addEvent('error', '请先登录后再启动视觉自动执行');
+      return;
+    }
+    if (!canPlayRecording()) {
+      addEvent('error', '视觉自动执行需要动作模式、已连接从臂，且当前没有其他动作');
+      setVisionResultText('视觉自动执行未启动: 需要动作模式、连接从臂并保持空闲');
+      return;
+    }
+    visionAutoRunning = true;
+    startVisionAutoTick();
+    setVisionResultText('视觉自动执行已启动，准备拍照识别...');
+    addEvent('info', '视觉自动执行已启动，识别到单一颜色后会直接执行对应动作');
+    updateProductActionAvailability();
+    runVisionAutoCycle();
+  }
+
+  function stopVisionAuto(message) {
+    visionAutoRunning = false;
+    clearVisionAutoTimer();
+    stopVisionAutoTick();
+    if (message) setVisionResultText(message);
+    updateProductActionAvailability();
+  }
+
+  function toggleVisionAuto() {
+    if (visionAutoRunning) {
+      stopVisionAuto('视觉自动执行已停止');
+      addEvent('warn', '视觉自动执行已停止');
+    } else {
+      startVisionAuto();
+    }
+  }
+
+  function runVisionAutoCycle() {
+    if (!visionAutoRunning || visionInspecting) return;
+    clearVisionAutoTimer();
+    if (lastStatus && lastStatus.busy) {
+      setVisionResultText('动作执行中，暂停视觉识别');
+      scheduleVisionAutoNext(VISION_AUTO_INTERVAL_MS);
+      return;
+    }
+    if (!canPlayRecording()) {
+      setVisionResultText('等待动作模式、连接从臂并保持空闲');
+      scheduleVisionAutoNext(VISION_AUTO_INTERVAL_MS);
+      return;
+    }
+
+    visionInspecting = true;
+    setVisionResultText('正在拍照、算法识别并准备直接执行动作...');
+    updateProductActionAvailability();
+    api('POST', '/api/vision/run', { repeat: getProductActionRepeatCount() }).then(function (res) {
+      if (!res) {
+        setVisionResultText('视觉自动执行请求失败，等待下一轮');
+        return;
+      }
+      renderVisionResult(res);
+      if (res.ok && res.executed) {
+        addEvent('ok', '视觉识别已直接执行动作: ' + (res.recommended_action_name || res.recommended_action_id));
+      } else if (res.ok && res.conflict) {
+        addEvent('warn', res.message || '视觉识别冲突: 只能放置一种颜色');
+      } else if (res.ok) {
+        addEvent('warn', res.message || '视觉识别完成，未执行动作');
+      } else {
+        addEvent('error', '视觉自动执行失败: ' + (res.error || res.message || 'unknown'));
+      }
+      refreshStatus();
+      loadProductActions();
+    }).then(function () {
+      visionInspecting = false;
+      updateProductActionAvailability();
+      if (visionAutoRunning) {
+        scheduleVisionAutoNext(VISION_AUTO_INTERVAL_MS);
+      }
+    });
   }
 
   function selectProductActionById(id) {
@@ -599,21 +740,23 @@
   function inspectVision() {
     if (visionInspecting) return;
     visionInspecting = true;
-    if (visionResult) visionResult.textContent = '正在拍照识别...';
+    setVisionResultText('正在拍照、算法识别并准备直接执行动作...');
     updateProductActionAvailability();
-    api('POST', '/api/vision/inspect', {}, 10000).then(function (res) {
+    api('POST', '/api/vision/run', { repeat: getProductActionRepeatCount() }, 120000).then(function (res) {
       if (!res) return;
       renderVisionResult(res);
-      if (res.ok && res.recommended_action_id) {
+      if (res.ok && res.executed && res.recommended_action_id) {
         if (selectProductActionById(res.recommended_action_id)) {
-          addEvent('ok', '视觉识别已选择动作: ' + (res.recommended_action_name || res.recommended_action_id));
+          addEvent('ok', '视觉识别已直接执行动作: ' + (res.recommended_action_name || res.recommended_action_id));
         } else {
-          addEvent('warn', '视觉识别有推荐动作，但当前列表中不可选: ' + res.recommended_action_id);
+          addEvent('ok', '视觉识别已直接执行动作: ' + (res.recommended_action_name || res.recommended_action_id));
         }
+      } else if (res.ok && res.conflict) {
+        addEvent('warn', res.message || '视觉识别冲突: 只能放置一种颜色');
       } else if (res.ok) {
-        addEvent('warn', '视觉识别完成，但没有匹配到已发布动作');
+        addEvent('warn', res.message || '视觉识别完成，未执行动作');
       } else {
-        addEvent('error', '视觉识别失败: ' + (res.error || 'unknown'));
+        addEvent('error', '视觉识别执行失败: ' + (res.error || res.message || 'unknown'));
       }
     }).then(function () {
       visionInspecting = false;
@@ -2115,7 +2258,7 @@
   recordingPlayBtn.onclick = playSelectedRecording;
   if (productActionRefreshBtn) productActionRefreshBtn.onclick = loadProductActions;
   if (productActionSelect) productActionSelect.onchange = updateProductActionMeta;
-  if (visionInspectBtn) visionInspectBtn.onclick = inspectVision;
+  if (visionInspectBtn) visionInspectBtn.onclick = toggleVisionAuto;
   if (productActionRunBtn) productActionRunBtn.onclick = function () {
     var action = selectedProductAction();
     runProductAction(action && action.id);
