@@ -143,5 +143,44 @@
     "repeat": 1,
     "result": "ok",
     "error": ""
+  },
+  {
+    "ts_ms": 1782290012129,
+    "time": "2026-06-24 16:33:32",
+    "duration_ms": 57670,
+    "operator": "管理员",
+    "action_id": "action_5",
+    "action_name": "原材料5",
+    "source_template": "asset_raw_material_5_source",
+    "execution_template": "product_5_exec",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782290121320,
+    "time": "2026-06-24 16:35:21",
+    "duration_ms": 78752,
+    "operator": "管理员",
+    "action_id": "action_2_2",
+    "action_name": "材料不合格2",
+    "source_template": "asset_material_ng_2_source",
+    "execution_template": "product_2_2_exec",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
+  },
+  {
+    "ts_ms": 1782290524353,
+    "time": "2026-06-24 16:42:04",
+    "duration_ms": 57575,
+    "operator": "管理员",
+    "action_id": "action_5",
+    "action_name": "原材料5",
+    "source_template": "asset_raw_material_5_source",
+    "execution_template": "product_5_exec",
+    "repeat": 1,
+    "result": "ok",
+    "error": ""
   }
 ]
