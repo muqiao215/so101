@@ -16,7 +16,7 @@ body {
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 18px;
   background: rgba(33, 26, 22, 0.55);
   backdrop-filter: blur(8px);
 }
@@ -26,20 +26,20 @@ body {
   border: 1px solid rgba(49, 43, 34, 0.2);
   background: rgba(255, 252, 244, 0.96);
   box-shadow: 0 24px 80px rgba(24, 20, 16, 0.28);
-  border-radius: 14px;
-  padding: 26px;
+  border-radius: 10px;
+  padding: 18px;
 }
 
 .login-card h1 {
-  margin: 8px 0 18px;
-  font-size: 30px;
+  margin: 6px 0 12px;
+  font-size: 22px;
 }
 
 .role-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .role-tabs button {
@@ -48,13 +48,13 @@ body {
 
 .login-field {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   color: #5f5542;
   font-weight: 700;
 }
 
 .login-field + .login-field {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .login-field input {
@@ -62,7 +62,7 @@ body {
   box-sizing: border-box;
   border: 1px solid rgba(55, 45, 31, 0.24);
   border-radius: 8px;
-  padding: 11px 12px;
+  padding: 8px 10px;
   background: #fffdf6;
   color: #211a16;
 }
@@ -70,26 +70,26 @@ body {
 .login-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .shell {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 28px;
+  padding: 18px;
 }
 
 .hero, .panel {
   border: 1px solid rgba(49, 43, 34, 0.18);
   background: rgba(255, 252, 244, 0.82);
   box-shadow: 0 20px 60px rgba(46, 39, 28, 0.13);
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: 14px;
+  padding: 16px;
 }
 
 .section-title {
-  margin: 22px 0 0;
-  font-size: 20px;
+  margin: 14px 0 0;
+  font-size: 16px;
   color: #2f4b3c;
 }
 
@@ -97,7 +97,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .panel-heading h2 {
@@ -106,7 +106,7 @@ body {
 
 .compact-toggle {
   border-radius: 8px;
-  padding: 7px 12px;
+  padding: 5px 10px;
   font-size: 12px;
 }
 
@@ -116,45 +116,45 @@ body {
 
 .hero-top {
   display: flex;
-  gap: 20px;
+  gap: 14px;
   justify-content: space-between;
   align-items: flex-start;
 }
 
 .hero-copy {
   max-width: 720px;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: #5f5542;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .hero-footnote {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #8b6721;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .hero-status {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   justify-items: end;
 }
 
 .workflow-bar {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .workflow-step {
-  min-height: 44px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 700;
   background: rgba(118, 139, 111, 0.12);
   border: 1px solid rgba(49, 43, 34, 0.12);
@@ -177,8 +177,8 @@ body {
 }
 
 .hero h1 {
-  margin: 8px 0;
-  font-size: 42px;
+  margin: 6px 0;
+  font-size: 30px;
 }
 
 .eyebrow {
@@ -191,8 +191,8 @@ body {
 .actions, .template-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .template-item {
@@ -220,8 +220,8 @@ body {
 
 .template-empty {
   color: #6d624f;
-  font-size: 13px;
-  padding: 10px 0;
+  font-size: 12px;
+  padding: 6px 0;
 }
 
 button {
@@ -229,7 +229,7 @@ button {
   background: #2f4b3c;
   color: #fffaf0;
   border-radius: 999px;
-  padding: 12px 18px;
+  padding: 8px 14px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -264,44 +264,44 @@ button.active {
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin: 18px 0;
+  gap: 12px;
+  margin: 12px 0;
 }
 
 .panel {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .status-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .status-grid div {
-  padding: 12px;
-  border-radius: 16px;
+  padding: 9px;
+  border-radius: 10px;
   background: rgba(118, 139, 111, 0.12);
 }
 
 .status-panel {
-  padding: 16px;
+  padding: 12px;
 }
 
 .status-panel h2 {
   margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 18px;
+  margin-bottom: 8px;
+  font-size: 15px;
 }
 
 .status-grid-compact {
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .status-grid-compact div {
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
 }
 
 .status-grid-compact dt {
@@ -309,17 +309,17 @@ button.active {
 }
 
 .status-grid-compact dd {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 dt {
   color: #6d624f;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
 dd {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   word-break: break-all;
 }
 
@@ -329,8 +329,8 @@ dd {
 
 pre {
   overflow: auto;
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 12px;
   background: #20251f;
   color: #e7f0dd;
 }
@@ -338,8 +338,8 @@ pre {
 .event {
   display: grid;
   grid-template-columns: 120px 1fr;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
@@ -348,30 +348,30 @@ pre {
 .event.warn strong { color: #8b6721; }
 
 .admin-panel h2 {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .login-records {
   display: grid;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .compact-more {
   color: #6e6a61;
-  font-size: 12px;
-  padding: 4px 2px 0;
+  font-size: 11px;
+  padding: 2px 0 0;
 }
 
 .login-record {
   display: grid;
   grid-template-columns: 160px 90px 1fr;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
   background: rgba(118, 139, 111, 0.12);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .login-record .role {
@@ -381,9 +381,9 @@ pre {
 
 .hardware-badge {
   display: inline-block;
-  padding: 6px 14px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 .hardware-badge.connected { background: #2f6b3d; color: #fff; }
@@ -394,44 +394,44 @@ pre {
 .joint-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 .joint-card {
-  padding: 14px;
-  border-radius: 16px;
+  padding: 10px;
+  border-radius: 10px;
   background: rgba(42, 82, 152, 0.08);
   text-align: center;
   border: 1px solid rgba(42, 82, 152, 0.15);
 }
-.joint-name { font-weight: 700; font-size: 14px; color: #2a5298; }
+.joint-name { font-weight: 700; font-size: 13px; color: #2a5298; }
 .joint-id { font-size: 11px; color: #6d624f; margin: 2px 0; }
 .joint-raw { font-size: 11px; color: #8b6721; font-family: monospace; }
-.joint-deg { font-size: 18px; font-weight: 700; color: #211a16; margin-top: 4px; }
+.joint-deg { font-size: 15px; font-weight: 700; color: #211a16; margin-top: 2px; }
 .joint-card.empty {
   color: #9c3427;
   font-weight: 700;
 }
 
 #manualModeHint {
-  font-size: 12px;
+  font-size: 11px;
   color: #8b6721;
   font-weight: 400;
 }
 
 .axis-controls {
   display: grid;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .axis-row {
   display: grid;
   grid-template-columns: 150px 42px minmax(180px, 1fr) 92px 70px 42px;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  padding: 10px;
-  border-radius: 12px;
+  padding: 8px;
+  border-radius: 8px;
   background: rgba(118, 139, 111, 0.12);
 }
 
@@ -455,7 +455,7 @@ pre {
   width: 100%;
   border: 1px solid rgba(55, 45, 31, 0.22);
   border-radius: 8px;
-  padding: 9px 10px;
+  padding: 6px 8px;
   background: #fffaf0;
   color: #211a16;
   font-weight: 700;
@@ -463,10 +463,10 @@ pre {
 
 .axis-step {
   width: 42px;
-  height: 38px;
+  height: 32px;
   padding: 0;
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .axis-readout {
@@ -478,14 +478,14 @@ pre {
 .manual-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .manual-actions select {
   border: 1px solid rgba(55, 45, 31, 0.22);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 7px 10px;
   background: #fffaf0;
   color: #211a16;
 }
@@ -493,7 +493,7 @@ pre {
 .record-grid, .playback-grid, .teleop-grid, .product-action-grid {
   display: grid;
   grid-template-columns: 1fr 180px 140px;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
 }
 
@@ -515,9 +515,9 @@ pre {
 
 .record-grid label, .playback-grid label, .teleop-grid label, .product-action-grid label {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   color: #6d624f;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -531,7 +531,7 @@ pre {
   width: 100%;
   border: 1px solid rgba(55, 45, 31, 0.22);
   border-radius: 8px;
-  padding: 10px;
+  padding: 7px 9px;
   background: #fffaf0;
   color: #211a16;
 }
@@ -543,58 +543,58 @@ pre {
 
 .record-count {
   border-radius: 8px;
-  padding: 11px 12px;
+  padding: 7px 10px;
   background: rgba(42, 82, 152, 0.08);
   font-family: monospace;
   font-weight: 700;
 }
 
 .vision-result {
-  margin-top: 14px;
+  margin-top: 10px;
   border-radius: 8px;
-  padding: 11px 12px;
+  padding: 8px 10px;
   background: rgba(47, 107, 61, 0.09);
   color: #40513b;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .vision-snapshot {
   display: block;
   width: min(100%, 720px);
-  max-height: 260px;
+  max-height: 220px;
   object-fit: contain;
-  margin-top: 12px;
+  margin-top: 8px;
   border: 1px solid rgba(49, 43, 34, 0.18);
   border-radius: 8px;
   background: #211a16;
 }
 
 #recordHint {
-  font-size: 12px;
+  font-size: 11px;
   color: #8b6721;
   font-weight: 400;
 }
 
 #playbackHint, #teleopHint {
-  font-size: 12px;
+  font-size: 11px;
   color: #8b6721;
   font-weight: 400;
 }
 
 .product-action-list {
   display: grid;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .product-action-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  gap: 10px;
   align-items: center;
-  padding: 12px;
+  padding: 9px;
   border-radius: 8px;
   background: rgba(118, 139, 111, 0.12);
   border: 1px solid rgba(49, 43, 34, 0.1);
@@ -603,32 +603,32 @@ pre {
 .product-action-main {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 6px 10px;
   align-items: center;
   min-width: 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .product-action-main strong {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .product-action-main small {
   flex-basis: 100%;
   color: #6d624f;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .product-action-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .product-action-actions button {
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   font-size: 12px;
 }
 
@@ -636,10 +636,10 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
+  min-width: 42px;
   border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 3px 7px;
+  font-size: 11px;
   font-weight: 700;
   background: rgba(109, 98, 79, 0.16);
   color: #5f5542;
@@ -662,18 +662,18 @@ pre {
 
 .business-run-log {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .business-run-row {
   display: grid;
   grid-template-columns: 150px 90px minmax(140px, 1fr) 54px 68px minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 7px 10px;
   border-radius: 8px;
   background: rgba(42, 82, 152, 0.07);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .business-run-row span,
@@ -691,7 +691,7 @@ pre {
     grid-template-columns: 1fr;
   }
   .hero h1 {
-    font-size: 32px;
+    font-size: 24px;
   }
   .axis-row {
     grid-template-columns: 1fr 38px 38px;
@@ -756,48 +756,48 @@ pre {
   background: #1f2622;
   color: #e9efe5;
   border: 1px solid #3a4640;
-  border-radius: 12px;
-  padding: 22px 24px 18px;
+  border-radius: 10px;
+  padding: 14px 18px 12px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .modal-card h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
 }
 
 .modal-meta {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: #b8c2b6;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .modal-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   color: #8a948c;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .modal-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 12px;
   color: #cfd6cb;
 }
 
 .modal-field input {
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid #3a4640;
   background: #151a17;
   color: #e9efe5;
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
 }
 
@@ -808,7 +808,7 @@ pre {
 
 .modal-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
   margin-top: 4px;
 }
