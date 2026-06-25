@@ -103,6 +103,7 @@
   ];
   var CAL = null;
   var lastStatus = null;
+  var lastBusy = false;
   var manualState = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
   var manualInitialized = false;
   var autoSyncAttempted = false;
@@ -636,10 +637,13 @@
     visionAutoTickTimer = null;
   }
 
-  function scheduleVisionAutoNext(delayMs) {
+  function scheduleVisionAutoNext(delayMs, minDelayMs) {
     clearVisionAutoTimer();
     if (!visionAutoRunning) return;
-    var delay = Math.max(3000, Number(delayMs || VISION_AUTO_INTERVAL_MS));
+    var delay = Number(delayMs || VISION_AUTO_INTERVAL_MS);
+    var minDelay = (minDelayMs === undefined || minDelayMs === null) ? 3000 : Number(minDelayMs);
+    if (minDelay < 0) minDelay = 0;
+    if (delay < minDelay) delay = minDelay;
     visionAutoDueAt = Date.now() + delay;
     updateVisionAutoCountdown();
     visionAutoTimer = setTimeout(runVisionAutoCycle, delay);
@@ -1850,7 +1854,13 @@
 
   function renderStatus(status) {
     if (!status) return;
+    var wasBusy = lastBusy;
+    var isBusy = !!status.busy;
     lastStatus = status;
+    lastBusy = isBusy;
+    if (visionAutoRunning && !visionInspecting && wasBusy && !isBusy) {
+      scheduleVisionAutoNext(500, 0);
+    }
 
     var obs = status.last_observation || {};
     var hwConn = !!(status.connected || obs.connected);
