@@ -259,7 +259,8 @@
     setElementVisible(productActionAdminPanel, isAdmin);
     setElementVisible(businessRunLogPanel, isAdmin);
     for (var i = 0; i < maintenancePanels.length; i++) {
-      setElementVisible(maintenancePanels[i], isAdmin);
+      var el = maintenancePanels[i];
+      setElementVisible(el, isAdmin || el.classList.contains('role-operator'));
     }
     if (isAdmin) {
       loadLoginRecords();

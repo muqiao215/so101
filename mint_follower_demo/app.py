@@ -3907,51 +3907,51 @@ class Handler(BaseHTTPRequestHandler):
                     save_login_records([])
                     self._send_json({"ok": True, "records": []})
             elif path == "/api/teleop/scan":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.scan_leader(body.get("leader_port", ""), body.get("leader_ids", [])))
             elif path == "/api/teleop/prepare-calibration":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.prepare_teleop_calibration())
             elif path == "/api/teleop/calibrate":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.calibrate_teleop(body))
             elif path == "/api/gripper/prepare-min":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.prepare_gripper_min_calibration(body))
             elif path == "/api/gripper/save-min":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.save_gripper_min_calibration(body))
             elif path == "/api/follower-gripper/prepare-min":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.prepare_follower_gripper_min_calibration())
             elif path == "/api/follower-gripper/save-min":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.save_follower_gripper_min_calibration())
             elif path == "/api/follower-gripper/close-test":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.test_follower_gripper_close(body))
             elif path == "/api/teleop/start":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.start_teleop(body))
             elif path == "/api/teleop/pause":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.pause_teleop())
             elif path == "/api/teleop/resume":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.resume_teleop())
             elif path == "/api/teleop/stop":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.stop_teleop())
             elif path == "/api/control/initialize":
@@ -3959,7 +3959,7 @@ class Handler(BaseHTTPRequestHandler):
                 if session:
                     self._send_json(RUNTIME.initialize_control(body.get("positions", []), body.get("source", "current_observation")))
             elif path == "/api/recording/save":
-                session = self._require_admin()
+                session = self._require_login()
                 if session:
                     self._send_json(RUNTIME.save_recording(body.get("name", "recording"), body.get("points", []), body.get("delay", 0.25)))
             elif path == "/api/recording/load":

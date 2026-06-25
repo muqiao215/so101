@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>SO101 Mint Follower Demo</title>
-  <link rel="stylesheet" href="/style.css?v=22">
+  <link rel="stylesheet" href="/style.css?v=23">
 </head>
 <body>
   <section id="loginGate" class="login-gate">
@@ -55,11 +55,9 @@
         <label class="product-action-label">产品动作 <select id="productActionSelect"></select></label>
         <label class="product-action-label">执行次数 <input id="productActionRepeatInput" type="number" min="1" max="20" step="1" value="1"></label>
         <div id="productActionMeta" class="record-count">未选择产品动作</div>
+        <button id="visionInspectBtn" class="secondary">视觉自动执行</button>
         <button id="productActionRefreshBtn" class="secondary">刷新</button>
         <button id="productActionRunBtn">执行产品动作</button>
-      </div>
-      <div class="manual-actions">
-        <button id="visionInspectBtn" class="secondary">视觉自动执行</button>
       </div>
       <div id="visionResult" class="vision-result">视觉识别未运行</div>
       <img id="visionSnapshot" class="vision-snapshot hidden" alt="视觉识别结果">
@@ -115,14 +113,14 @@
       </div>
     </section>
 
-    <h2 class="section-title maintenance-panel hidden">设备调试与维护</h2>
+    <h2 class="section-title maintenance-panel hidden role-operator">设备调试与维护</h2>
 
     <section class="panel maintenance-panel hidden">
       <h2>实时关节位置 <span id="jointTimestamp"></span></h2>
       <div id="jointGrid" class="joint-grid"></div>
     </section>
 
-    <section class="panel maintenance-panel hidden">
+    <section class="panel maintenance-panel hidden role-operator">
       <h2>时间段动作录制 <span id="recordHint"></span></h2>
       <div class="record-grid">
         <label>动作名称 <input id="recordNameInput" type="text" value="" placeholder="例如 inspection_sweep"></label>
@@ -154,7 +152,7 @@
       </div>
     </section>
 
-    <section class="panel maintenance-panel hidden">
+    <section class="panel maintenance-panel hidden role-operator">
       <h2>主从遥操作 <span id="teleopHint"></span></h2>
       <div class="teleop-grid">
         <label>主臂串口 <input id="leaderPortInput" type="text" value="/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00"></label>
@@ -227,6 +225,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=43"></script>
+  <script src="/app.js?v=44"></script>
 </body>
 </html>

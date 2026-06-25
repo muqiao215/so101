@@ -74,9 +74,9 @@ body {
 }
 
 .shell {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 18px;
+  padding: 16px;
 }
 
 .hero, .panel {
@@ -84,11 +84,11 @@ body {
   background: rgba(255, 252, 244, 0.82);
   box-shadow: 0 20px 60px rgba(46, 39, 28, 0.13);
   border-radius: 14px;
-  padding: 16px;
+  padding: 14px;
 }
 
 .section-title {
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   font-size: 16px;
   color: #2f4b3c;
 }
@@ -177,8 +177,8 @@ body {
 }
 
 .hero h1 {
-  margin: 6px 0;
-  font-size: 30px;
+  margin: 4px 0;
+  font-size: 26px;
 }
 
 .eyebrow {
@@ -191,8 +191,8 @@ body {
 .actions, .template-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .template-item {
@@ -269,7 +269,7 @@ button.active {
 }
 
 .panel {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .status-grid {
@@ -479,7 +479,7 @@ pre {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .manual-actions select {
@@ -612,8 +612,8 @@ pre {
   font-size: 11px;
 }
 
-.employee-panel .manual-actions {
-  margin-top: 8px;
+.employee-controls button {
+  flex: 0 0 auto;
 }
 
 #recordHint {
