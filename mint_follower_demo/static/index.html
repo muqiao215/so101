@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>SO101 Mint Follower Demo</title>
-  <link rel="stylesheet" href="/style.css?v=21">
+  <link rel="stylesheet" href="/style.css?v=22">
 </head>
 <body>
   <section id="loginGate" class="login-gate">
@@ -50,17 +50,16 @@
 
     <h2 class="section-title">员工执行</h2>
 
-    <section class="panel">
-      <h2>员工执行</h2>
-      <div class="product-action-grid">
-        <label>产品动作 <select id="productActionSelect"></select></label>
-        <label>执行次数 <input id="productActionRepeatInput" type="number" min="1" max="20" step="1" value="1"></label>
+    <section class="panel employee-panel">
+      <div class="employee-controls">
+        <label class="product-action-label">产品动作 <select id="productActionSelect"></select></label>
+        <label class="product-action-label">执行次数 <input id="productActionRepeatInput" type="number" min="1" max="20" step="1" value="1"></label>
         <div id="productActionMeta" class="record-count">未选择产品动作</div>
+        <button id="productActionRefreshBtn" class="secondary">刷新</button>
+        <button id="productActionRunBtn">执行产品动作</button>
       </div>
       <div class="manual-actions">
         <button id="visionInspectBtn" class="secondary">视觉自动执行</button>
-        <button id="productActionRefreshBtn" class="secondary">刷新产品动作</button>
-        <button id="productActionRunBtn">执行产品动作</button>
       </div>
       <div id="visionResult" class="vision-result">视觉识别未运行</div>
       <img id="visionSnapshot" class="vision-snapshot hidden" alt="视觉识别结果">
@@ -228,6 +227,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=42"></script>
+  <script src="/app.js?v=43"></script>
 </body>
 </html>

@@ -700,26 +700,45 @@
     }
 
     visionInspecting = true;
-    setVisionResultText('正在拍照、算法识别并准备直接执行动作...');
+    setVisionResultText('正在拍照与算法识别...');
     updateProductActionAvailability();
-    api('POST', '/api/vision/run', { repeat: getProductActionRepeatCount() }).then(function (res) {
+    var repeat = getProductActionRepeatCount();
+    api('POST', '/api/vision/inspect', {}).then(function (res) {
       if (!res) {
-        setVisionResultText('视觉自动执行请求失败，等待下一轮');
-        return;
+        setVisionResultText('视觉识别请求失败，等待下一轮');
+        return null;
       }
       renderVisionResult(res);
-      if (res.ok && res.executed) {
-        addEvent('ok', '视觉识别已直接执行动作: ' + (res.recommended_action_name || res.recommended_action_id));
-      } else if (res.ok && res.conflict) {
-        addEvent('warn', res.message || '视觉识别冲突: 只能放置一种颜色');
-      } else if (res.ok) {
-        addEvent('warn', res.message || '视觉识别完成，未执行动作');
-      } else {
-        addEvent('error', '视觉自动执行失败: ' + (res.error || res.message || 'unknown'));
+      if (!res.ok) {
+        addEvent('error', '视觉识别失败: ' + (res.error || 'unknown'));
+        return null;
       }
+      if (res.conflict) {
+        addEvent('warn', res.message || '视觉识别冲突: 只能放置一种颜色');
+        return null;
+      }
+      if (!res.recommended_action_id) {
+        addEvent('warn', res.message || '视觉识别完成，未执行动作');
+        return null;
+      }
+      setVisionResultText('已识别 ' + (res.recommended_action_name || '') + '，开始执行动作...');
+      return api('POST', '/api/product-action/run', {
+        id: res.recommended_action_id,
+        repeat: repeat
+      }, 180000).then(function (run) {
+        var name = res.recommended_action_name || res.recommended_action_id;
+        if (run && run.ok) {
+          addEvent('ok', '视觉识别已直接执行动作: ' + name);
+          setVisionResultText('已执行视觉匹配动作: ' + name);
+        } else {
+          addEvent('error', '视觉匹配动作执行失败: ' + (run && run.error || 'unknown'));
+          setVisionResultText('视觉匹配动作执行未完成');
+        }
+        selectProductActionById(res.recommended_action_id);
+      });
+    }).then(function () {
       refreshStatus();
       loadProductActions();
-    }).then(function () {
       visionInspecting = false;
       updateProductActionAvailability();
       if (visionAutoRunning) {
@@ -744,25 +763,42 @@
   function inspectVision() {
     if (visionInspecting) return;
     visionInspecting = true;
-    setVisionResultText('正在拍照、算法识别并准备直接执行动作...');
+    setVisionResultText('正在拍照与算法识别...');
     updateProductActionAvailability();
-    api('POST', '/api/vision/run', { repeat: getProductActionRepeatCount() }, 120000).then(function (res) {
-      if (!res) return;
+    var repeat = getProductActionRepeatCount();
+    api('POST', '/api/vision/inspect', {}, 120000).then(function (res) {
+      if (!res) return null;
       renderVisionResult(res);
-      if (res.ok && res.executed && res.recommended_action_id) {
-        if (selectProductActionById(res.recommended_action_id)) {
-          addEvent('ok', '视觉识别已直接执行动作: ' + (res.recommended_action_name || res.recommended_action_id));
-        } else {
-          addEvent('ok', '视觉识别已直接执行动作: ' + (res.recommended_action_name || res.recommended_action_id));
-        }
-      } else if (res.ok && res.conflict) {
-        addEvent('warn', res.message || '视觉识别冲突: 只能放置一种颜色');
-      } else if (res.ok) {
-        addEvent('warn', res.message || '视觉识别完成，未执行动作');
-      } else {
-        addEvent('error', '视觉识别执行失败: ' + (res.error || res.message || 'unknown'));
+      if (!res.ok) {
+        addEvent('error', '视觉识别失败: ' + (res.error || 'unknown'));
+        return null;
       }
+      if (res.conflict) {
+        addEvent('warn', res.message || '视觉识别冲突: 只能放置一种颜色');
+        return null;
+      }
+      if (!res.recommended_action_id) {
+        addEvent('warn', res.message || '视觉识别完成，未执行动作');
+        return null;
+      }
+      setVisionResultText('已识别 ' + (res.recommended_action_name || '') + '，开始执行动作...');
+      return api('POST', '/api/product-action/run', {
+        id: res.recommended_action_id,
+        repeat: repeat
+      }, 180000).then(function (run) {
+        var name = res.recommended_action_name || res.recommended_action_id;
+        if (run && run.ok) {
+          selectProductActionById(res.recommended_action_id);
+          addEvent('ok', '视觉识别已直接执行动作: ' + name);
+          setVisionResultText('已执行视觉匹配动作: ' + name);
+        } else {
+          addEvent('error', '视觉匹配动作执行失败: ' + (run && run.error || 'unknown'));
+          setVisionResultText('视觉匹配动作执行未完成');
+        }
+      });
     }).then(function () {
+      refreshStatus();
+      loadProductActions();
       visionInspecting = false;
       updateProductActionAvailability();
     });
