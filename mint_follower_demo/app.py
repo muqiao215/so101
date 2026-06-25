@@ -21,6 +21,7 @@ import time
 import traceback
 import zlib
 import binascii
+import glob
 
 try:
     import cv2
@@ -1213,6 +1214,47 @@ class NativeFeetechSTSBus(object):
         return result
 
 
+def discover_serial_ports():
+    """List candidate serial device paths, stable by-id names first."""
+    candidates = []
+    seen = set()
+    for pattern in ("/dev/serial/by-id/*", "/dev/ttyACM*", "/dev/ttyUSB*"):
+        for path in sorted(glob.glob(pattern)):
+            if os.path.exists(path) and path not in seen:
+                seen.add(path)
+                candidates.append(path)
+    return candidates
+
+
+def quick_probe_motors(port, serial_config, ids):
+    """Open a port, do a fast scan for the expected motor IDs, close it.
+
+    Returns True only if every expected motor answered. Read-only pings, so it
+    is safe to run against unknown devices: non-Feetech ports simply time out.
+    """
+    probe_config = dict(serial_config)
+    probe_config["port"] = port
+    probe_config["scan_window_sec"] = 2.5
+    probe_config["scan_retries"] = 2
+    probe_config["scan_retry_delay_sec"] = 0.2
+    probe_config["serial_settle_sec"] = 0.3
+    bus = NativeFeetechSTSBus(probe_config)
+    try:
+        bus.connect()
+    except Exception:
+        return False
+    try:
+        found = bus.scan_expected(ids)
+        return len(found) >= len(ids)
+    except Exception:
+        return False
+    finally:
+        try:
+            bus.disconnect()
+        except Exception:
+            pass
+
+
 class FollowerDriver(object):
     def connect(self):
         raise NotImplementedError
@@ -1999,11 +2041,15 @@ class DemoRuntime(object):
             t.start()
 
     def _hardware_watcher(self):
-        port = self.serial_config.get("port", "/dev/ttyACM0")
         while not self._watcher_stop.is_set():
             self._watcher_stop.wait(2)
             if self._watcher_stop.is_set():
                 break
+            port = self.serial_config.get("port", "/dev/ttyACM0")
+            if not os.path.exists(port):
+                resolved = self._resolve_follower_port()
+                if resolved:
+                    port = resolved
             if not os.path.exists(port):
                 with self.lock:
                     self.state["connected"] = False
@@ -2136,6 +2182,59 @@ class DemoRuntime(object):
 
     def _save_serial_config(self):
         write_json(os.path.join(CONFIG_DIR, "serial_config.json"), self.serial_config)
+
+    def _apply_resolved_port(self, path, role):
+        previous = self.serial_config.get(role, "")
+        if not path or path == previous:
+            return False
+        self.serial_config[role] = path
+        if role == "port":
+            self.state["port"] = path
+        self._save_serial_config()
+        self._log("serial_port_resolved", {"role": role, "previous": previous, "port": path})
+        return True
+
+    def _resolve_follower_port(self):
+        """Find the follower bus when the configured port is missing.
+
+        The config ships with by-id paths tied to a specific machine. On another
+        host those paths do not exist, so we scan /dev/serial/by-id/*,
+        /dev/ttyACM*, /dev/ttyUSB* (skipping the leader port) and probe each
+        candidate for all expected follower motor IDs. The first bus that
+        answers is written back to serial_config and persisted, so the next
+        connect reuses it instead of scanning again.
+        """
+        if os.name == "nt":
+            return None
+        configured = str(self.serial_config.get("port", "")).strip()
+        if configured and os.path.exists(configured):
+            return None
+        leader_port = str(self.serial_config.get("leader_port", "")).strip()
+        ids = []
+        getter = getattr(self.driver, "_ids", None)
+        if callable(getter):
+            try:
+                ids = [int(v) for v in getter()]
+            except Exception:
+                ids = []
+        candidates = [p for p in discover_serial_ports() if p != leader_port]
+        if not candidates:
+            return None
+        for path in candidates:
+            if not os.access(path, os.R_OK | os.W_OK):
+                subprocess.call(
+                    ["sudo", "-n", "chmod", "666", path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+            if not ids:
+                if os.access(path, os.R_OK | os.W_OK):
+                    self._apply_resolved_port(path, "port")
+                    return path
+                continue
+            if quick_probe_motors(path, self.serial_config, ids):
+                self._apply_resolved_port(path, "port")
+                return path
+        return None
 
     def set_mode(self, mode):
         mode = str(mode or "").strip().lower()
@@ -3363,8 +3462,13 @@ class DemoRuntime(object):
             self.state["control_init_source"] = ""
 
         try:
+            resolved = self._resolve_follower_port()
+            if resolved:
+                self.state["last_error"] = "已自动识别串口 %s，正在连接..." % resolved
             self._ensure_port_access()
             result = self.driver.connect()
+            if resolved and result.get("ok"):
+                result["resolved_port"] = resolved
         except Exception as exc:
             result = {"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}
 
