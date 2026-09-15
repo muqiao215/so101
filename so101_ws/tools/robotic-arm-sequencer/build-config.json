@@ -1,0 +1,51 @@
+{
+  "appId": "com.roboticarm.sequencer",
+  "productName": "Robotic Arm Sequencer",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "build/icon.ico",
+    "fileAssociations": [
+      {
+        "ext": "armseq",
+        "name": "Arm Sequence File",
+        "description": "Robotic Arm Sequence Project",
+        "icon": "build/file-icon.ico",
+        "role": "Editor"
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Robotic Arm Sequencer",
+    "perMachine": false,
+    "installerIcon": "build/installer-icon.ico",
+    "uninstallerIcon": "build/uninstaller-icon.ico",
+    "license": "LICENSE.txt"
+  },
+  "portable": {
+    "artifactName": "${productName}-${version}-Portable.${ext}"
+  },
+  "extraMetadata": {
+    "main": "dist/main/main.js"
+  }
+}

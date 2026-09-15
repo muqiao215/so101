@@ -1,0 +1,10 @@
+{
+  "online": true,
+  "controlInterface": "real-dir /dev/ttyACM0",
+  "powerState": "已上电",
+  "estopActive": false,
+  "mode": "保护待机",
+  "lastError": "",
+  "allowExecute": false,
+  "updatedAt": "2026-03-26 09:00:00 +0800"
+}

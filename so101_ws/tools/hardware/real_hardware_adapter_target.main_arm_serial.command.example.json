@@ -1,0 +1,13 @@
+{
+  "adapterId": "so101-main-arm-serial",
+  "source": {
+    "type": "command",
+    "command": "python3 ${SO101_WS_ROOT}/tools/hardware/export_main_arm_serial_status.py --port ${SO101_MAIN_ARM_PORT}"
+  },
+  "gate": {
+    "enabled": false,
+    "reasonCode": "HWS_002_PENDING",
+    "reason": "主臂串口已接入 WSL，但安全验证未完成，默认锁执行",
+    "source": "so101-main-arm-serial"
+  }
+}

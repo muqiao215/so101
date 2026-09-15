@@ -1,0 +1,25 @@
+[INFO] [launch]: All log files can be found below /home/muqiao/dev/ros2/workspaces/so101_ws/.vscode/.runtime/r2c003/ros_logs/2026-03-14-20-31-36-290771-muqiao-187560
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [187564]
+[INFO] [python3-2]: process started with pid [187566]
+[robot_state_publisher-1] [WARN] [1773491496.564326342] [kdl_parser]: The root link base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-1] [INFO] [1773491496.564440947] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-1] [INFO] [1773491496.564533349] [robot_state_publisher]: got segment gripper_frame_link
+[robot_state_publisher-1] [INFO] [1773491496.564546094] [robot_state_publisher]: got segment gripper_link
+[robot_state_publisher-1] [INFO] [1773491496.564551179] [robot_state_publisher]: got segment lower_arm_link
+[robot_state_publisher-1] [INFO] [1773491496.564555488] [robot_state_publisher]: got segment moving_jaw_so101_v1_link
+[robot_state_publisher-1] [INFO] [1773491496.564559992] [robot_state_publisher]: got segment shoulder_link
+[robot_state_publisher-1] [INFO] [1773491496.564564333] [robot_state_publisher]: got segment upper_arm_link
+[robot_state_publisher-1] [INFO] [1773491496.564568503] [robot_state_publisher]: got segment wrist_link
+[python3-2] [INFO] [1773491496.785090251] [so101_task_executor]: Task executor ready. Loaded templates: ['pick_place_default', 'pick_place_red', 'pick_place_blue']
+[python3-2] [INFO] [1773491496.785577115] [so101_task_executor]: Detection trigger: enabled=True, conf>=0.50, cooldown=8.0s, map={'red': 'pick_place_red', 'blue': 'pick_place_blue'}
+[python3-2] [INFO] [1773491500.346334159] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STARTED - template=pick_place_default
+[python3-2] [INFO] [1773491500.347139332] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 1/8 -> home
+[python3-2] [INFO] [1773491502.299136620] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 2/8 -> above_pick
+[python3-2] [INFO] [1773491504.257243855] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 3/8 -> pick
+[python3-2] [INFO] [1773491506.216805704] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 4/8 -> lift_from_pick
+[python3-2] [INFO] [1773491508.169516778] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 5/8 -> above_place
+[python3-2] [INFO] [1773491510.123178441] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 6/8 -> place
+[python3-2] [INFO] [1773491512.077993682] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 7/8 -> retreat
+[python3-2] [INFO] [1773491514.033025982] [so101_task_executor]: [req-r2c-20260314203135] 执行中 STEP - 8/8 -> home
+[python3-2] [INFO] [1773491515.988850962] [so101_task_executor]: [req-r2c-20260314203135] 完成 OK - Task completed

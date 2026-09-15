@@ -1,0 +1,4 @@
+E2E-001 本次`不通过`。`start_e2e_stack.sh` 停在 ROS2 启动阶段，最小根因是 `ros2 launch` 默认写 `~/.ros/log` 被拒绝，导致 backend/frontend 根本没启动到可验状态；我已按要求执行 `bash tools/e2e/stop_e2e_stack.sh` 清理。
+
+证据文件已写到：
+[E2E-001_实跑记录_2026-03-14.md](/home/muqiao/dev/ros2/workspaces/so101_ws/docs/evidence/E2E-001_实跑记录_2026-03-14.md)

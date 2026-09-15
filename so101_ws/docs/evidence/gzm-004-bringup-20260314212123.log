@@ -1,0 +1,25 @@
+[INFO] [launch]: All log files can be found below /home/muqiao/dev/ros2/workspaces/so101_ws/.vscode/.runtime/gzm004/ros_logs/2026-03-14-21-22-14-268174-muqiao-197184
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [197188]
+[INFO] [python3-2]: process started with pid [197190]
+[robot_state_publisher-1] [WARN] [1773494534.945342320] [kdl_parser]: The root link base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-1] [INFO] [1773494534.945463625] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-1] [INFO] [1773494534.945551624] [robot_state_publisher]: got segment gripper_frame_link
+[robot_state_publisher-1] [INFO] [1773494534.945564443] [robot_state_publisher]: got segment gripper_link
+[robot_state_publisher-1] [INFO] [1773494534.945570126] [robot_state_publisher]: got segment lower_arm_link
+[robot_state_publisher-1] [INFO] [1773494534.945574735] [robot_state_publisher]: got segment moving_jaw_so101_v1_link
+[robot_state_publisher-1] [INFO] [1773494534.945579561] [robot_state_publisher]: got segment shoulder_link
+[robot_state_publisher-1] [INFO] [1773494534.945583910] [robot_state_publisher]: got segment upper_arm_link
+[robot_state_publisher-1] [INFO] [1773494534.945588270] [robot_state_publisher]: got segment wrist_link
+[python3-2] [INFO] [1773494535.220480688] [so101_task_executor]: Task executor ready. Loaded templates: ['pick_place_default', 'pick_place_red', 'pick_place_blue']
+[python3-2] [INFO] [1773494535.220933547] [so101_task_executor]: Detection trigger: enabled=True, conf>=0.50, cooldown=8.0s, map={'red': 'pick_place_red', 'blue': 'pick_place_blue'}
+[python3-2] [INFO] [1773494539.531391935] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STARTED - template=pick_place_default
+[python3-2] [INFO] [1773494539.532465654] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 1/8 -> home
+[python3-2] [INFO] [1773494541.585927880] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 2/8 -> above_pick
+[python3-2] [INFO] [1773494543.537725691] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 3/8 -> pick
+[python3-2] [INFO] [1773494545.517563248] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 4/8 -> lift_from_pick
+[python3-2] [INFO] [1773494545.298464411] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 5/8 -> above_place
+[python3-2] [INFO] [1773494547.250436902] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 6/8 -> place
+[python3-2] [INFO] [1773494549.203937341] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 7/8 -> retreat
+[python3-2] [INFO] [1773494551.157718452] [so101_task_executor]: [req-gzm004-20260314212123] 执行中 STEP - 8/8 -> home
+[python3-2] [INFO] [1773494553.211069876] [so101_task_executor]: [req-gzm004-20260314212123] 完成 OK - Task completed

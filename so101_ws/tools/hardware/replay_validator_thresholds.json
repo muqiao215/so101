@@ -1,0 +1,55 @@
+{
+  "schema_version": "replay_validator.thresholds.v1",
+  "profiles": {
+    "identity_strict": {
+      "description": "for same-file or theoretically identical comparisons",
+      "hard": {
+        "overall.mae_rad": 0.001,
+        "overall.max_error_rad": 0.02,
+        "overall.duration_delta_abs_sec": 0.005,
+        "alignment.used_extrapolation": false,
+        "diagnostics.data_quality.nan_count": 0,
+        "diagnostics.data_quality.inf_count": 0,
+        "diagnostics.data_quality.out_of_range_count": 0,
+        "diagnostics.data_quality.missing_value_count": 0,
+        "diagnostics.joint_coverage.joint_name_mismatch": false
+      },
+      "soft": {
+        "metrics.overall.p95_error_rad": 0.005,
+        "diagnostics.edge_region.edge_max_error_rad": 0.02
+      },
+      "invalid": {
+        "identity_edge_spike_ratio_min": 10.0,
+        "identity_non_edge_max_error_rad_max": 0.02
+      }
+    },
+    "replay_default": {
+      "description": "for replay -> rerecord comparisons under ROS2 runtime jitter",
+      "hard": {
+        "overall.mae_rad": 0.03,
+        "overall.max_error_rad": 0.3,
+        "overall.duration_delta_abs_sec": 0.2,
+        "alignment.used_extrapolation": false,
+        "diagnostics.data_quality.nan_count": 0,
+        "diagnostics.data_quality.inf_count": 0,
+        "diagnostics.data_quality.out_of_range_count": 0,
+        "diagnostics.data_quality.missing_value_count": 0,
+        "diagnostics.joint_coverage.joint_name_mismatch": false
+      },
+      "soft": {
+        "metrics.overall.p95_error_rad": 0.08,
+        "overall.duration_ratio_min": 0.98,
+        "overall.duration_ratio_max": 1.02,
+        "diagnostics.edge_region.edge_max_error_rad": 0.25
+      },
+      "per_joint_hard": {
+        "mae_rad": 0.05,
+        "max_error_rad": 0.4
+      },
+      "per_joint_soft": {
+        "mae_rad": 0.03,
+        "max_error_rad": 0.25
+      }
+    }
+  }
+}

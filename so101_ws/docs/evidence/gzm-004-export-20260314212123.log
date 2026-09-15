@@ -1,0 +1,11 @@
+[INFO] [1773494521.535867529] [pick_place_runner]: === Iteration 1/1 ===
+[INFO] [1773494524.079067317] [pick_place_runner]: [home] pass on trial 1, planning_time=0.000s
+[INFO] [1773494525.299158904] [pick_place_runner]: [above_pick] pass on trial 1, planning_time=0.000s
+[INFO] [1773494527.217651273] [pick_place_runner]: [pick] pass on trial 1, planning_time=0.000s
+[INFO] [1773494528.145934291] [pick_place_runner]: [lift_from_pick] pass on trial 1, planning_time=0.000s
+[INFO] [1773494529.562999845] [pick_place_runner]: [above_place] pass on trial 1, planning_time=0.000s
+[INFO] [1773494531.286984463] [pick_place_runner]: [place] pass on trial 1, planning_time=0.000s
+[INFO] [1773494532.215433303] [pick_place_runner]: [retreat] pass on trial 1, planning_time=0.000s
+[INFO] [1773494532.215901081] [pick_place_runner]: Iteration 1 finished successfully
+[INFO] [1773494532.216218955] [pick_place_runner]: Summary: step_success=7/7 (100.0%)
+[INFO] [1773494532.248556690] [pick_place_runner]: Exported mapping yaml: /home/muqiao/dev/ros2/workspaces/so101_ws/docs/evidence/gzm-004-mapping-20260314212123.yaml

@@ -1,0 +1,4 @@
+Waiting for at least 1 matching subscription(s)...
+publisher: beginning loop
+publishing #1: std_msgs.msg.String(data='{"requestId":"req-r2c-20260314202721","orderId":"order-r2c-20260314202721","actionTemplateId":"pick_place_default","params":{}}')
+

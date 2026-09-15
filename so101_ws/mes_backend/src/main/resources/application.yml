@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: so101-mes-backend
+
+rosbridge:
+  url: ws://127.0.0.1:9090
+  cmd-topic: /mes_task_cmd
+  status-topic: /mes_task_status
+  detection-topic: /detections
+  vision-target-topic: /vision/targets

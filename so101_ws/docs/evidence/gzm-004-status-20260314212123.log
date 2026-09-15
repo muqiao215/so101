@@ -1,0 +1,10 @@
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STARTED", "message": "template=pick_place_default", "ts": 1773494539530}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "1/8 -> home", "ts": 1773494539532}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "2/8 -> above_pick", "ts": 1773494541585}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "3/8 -> pick", "ts": 1773494543537}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "4/8 -> lift_from_pick", "ts": 1773494545517}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "5/8 -> above_place", "ts": 1773494545297}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "6/8 -> place", "ts": 1773494547249}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "7/8 -> retreat", "ts": 1773494549203}
+{"requestId": "req-gzm004-20260314212123", "state": "执行中", "code": "STEP", "message": "8/8 -> home", "ts": 1773494551157}
+{"requestId": "req-gzm004-20260314212123", "state": "完成", "code": "OK", "message": "Task completed", "ts": 1773494553210}

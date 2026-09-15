@@ -1,0 +1,85 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+  <world name="so101_workcell">
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <scene>
+      <ambient>0.75 0.75 0.75 1</ambient>
+      <background>0.93 0.95 0.98 1</background>
+      <shadows>false</shadows>
+    </scene>
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <model name="work_table">
+      <static>true</static>
+      <pose>0.45 0.0 0.375 0 0 0</pose>
+      <link name="table_link">
+        <collision name="table_collision">
+          <geometry>
+            <box>
+              <size>0.9 0.7 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="table_visual">
+          <geometry>
+            <box>
+              <size>0.9 0.7 0.75</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.4 0.4 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pick_bin">
+      <static>true</static>
+      <pose>0.25 0.18 0.80 0 0 0</pose>
+      <link name="pick_bin_link">
+        <collision name="pick_bin_col">
+          <geometry><box><size>0.12 0.12 0.06</size></box></geometry>
+        </collision>
+        <visual name="pick_bin_vis">
+          <geometry><box><size>0.12 0.12 0.06</size></box></geometry>
+          <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.9 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="place_bin">
+      <static>true</static>
+      <pose>0.25 -0.18 0.80 0 0 0</pose>
+      <link name="place_bin_link">
+        <collision name="place_bin_col">
+          <geometry><box><size>0.12 0.12 0.06</size></box></geometry>
+        </collision>
+        <visual name="place_bin_vis">
+          <geometry><box><size>0.12 0.12 0.06</size></box></geometry>
+          <material><ambient>0.1 0.2 0.8 1</ambient><diffuse>0.2 0.3 0.9 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>1.35 -1.10 1.45 0 0.55 2.35</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
+  </world>
+</sdf>

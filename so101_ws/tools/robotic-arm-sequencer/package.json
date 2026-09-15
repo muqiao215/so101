@@ -1,0 +1,135 @@
+{
+  "name": "robotic-arm-sequencer",
+  "version": "1.0.0",
+  "description": "Windows Desktop Robotic Arm Sequencer with Cyberpunk UI",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "webpack --config webpack.main.config.js",
+    "build:renderer": "webpack --config webpack.renderer.config.js",
+    "build:preload": "tsc src/main/preload.ts --outDir dist/main --target ES2020 --module CommonJS --skipLibCheck",
+    "build": "npm run build:main && npm run build:renderer && npm run build:preload",
+    "dev:main": "webpack --config webpack.main.config.js --watch",
+    "dev:renderer": "webpack serve --config webpack.renderer.config.js --port 8080",
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
+    "start": "electron dist/main/main.js",
+    "electron:dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\" \"wait-on http://localhost:8080 && cross-env NODE_ENV=development electron dist/main/main.js\"",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "rebuild:native": "npm rebuild better-sqlite3",
+    "test": "jest",
+    "test:property": "jest --testNamePattern='Property'",
+    "test:unit": "jest --testNamePattern='Unit'",
+    "test:integration": "jest --testNamePattern='Integration'",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "electron",
+    "robotic-arm",
+    "sequencer",
+    "cyberpunk",
+    "arduino"
+  ],
+  "author": "Robotic Arm Sequencer Team",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.0.9",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-window": "^1.8.8",
+    "autoprefixer": "^10.4.23",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "css-loader": "^7.1.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "html-webpack-plugin": "^5.6.6",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "postcss": "^8.5.6",
+    "postcss-loader": "^8.2.0",
+    "rimraf": "^6.1.2",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^3.4.19",
+    "ts-jest": "^29.4.6",
+    "ts-loader": "^9.5.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "wait-on": "^9.0.3",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "fast-check": "^4.5.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-window": "^1.8.10",
+    "serialport": "^12.0.0"
+  },
+  "build": {
+    "appId": "com.roboticarm.sequencer",
+    "productName": "Robotic Arm Sequencer",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "fileAssociations": [
+        {
+          "ext": "armseq",
+          "name": "Arm Sequence File",
+          "description": "Robotic Arm Sequence Project",
+          "icon": "build/file-icon.ico",
+          "role": "Editor"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Robotic Arm Sequencer",
+      "perMachine": false,
+      "installerIcon": "build/installer-icon.ico",
+      "uninstallerIcon": "build/uninstaller-icon.ico"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable.${ext}"
+    },
+    "extraMetadata": {
+      "main": "dist/main/main.js"
+    }
+  }
+}

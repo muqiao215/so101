@@ -1,0 +1,10 @@
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STARTED", "message": "template=pick_place_default", "ts": 1773493322681}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "1/8 -> home", "ts": 1773493322683}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "2/8 -> above_pick", "ts": 1773493324637}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "3/8 -> pick", "ts": 1773493326591}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "4/8 -> lift_from_pick", "ts": 1773493328580}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "5/8 -> above_place", "ts": 1773493330534}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "6/8 -> place", "ts": 1773493332488}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "7/8 -> retreat", "ts": 1773493334439}
+{"requestId": "req-r2c-20260314210158", "state": "执行中", "code": "STEP", "message": "8/8 -> home", "ts": 1773493336391}
+{"requestId": "req-r2c-20260314210158", "state": "完成", "code": "OK", "message": "Task completed", "ts": 1773493338344}

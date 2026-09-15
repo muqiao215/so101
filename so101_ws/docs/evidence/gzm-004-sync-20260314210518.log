@@ -1,0 +1,4 @@
+synced mapped trajectory into /home/muqiao/dev/ros2/workspaces/so101_ws/src/so101_bringup/config/waypoints.yaml
+source export: /home/muqiao/dev/ros2/workspaces/so101_ws/docs/evidence/pick_place_mapping.yaml
+target template: pick_place_default
+alias templates: pick_place_red, pick_place_blue

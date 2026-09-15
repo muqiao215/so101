@@ -1,0 +1,85 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+gazebo_ros2_control:
+  ros__parameters:
+    hold_joints: true
+    pid_gains:
+      position:
+        shoulder_pan:
+          kp: 5.0
+          ki: 0.0
+          kd: 0.1
+        shoulder_lift:
+          kp: 5.0
+          ki: 0.0
+          kd: 0.1
+        elbow_flex:
+          kp: 5.0
+          ki: 0.0
+          kd: 0.1
+        wrist_flex:
+          kp: 3.0
+          ki: 0.0
+          kd: 0.05
+        wrist_roll:
+          kp: 2.0
+          ki: 0.0
+          kd: 0.02
+        gripper:
+          kp: 1.0
+          ki: 0.0
+          kd: 0.01
+
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - shoulder_pan
+      - shoulder_lift
+      - elbow_flex
+      - wrist_flex
+      - wrist_roll
+      - gripper
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_partial_joints_goal: false
+    # Controller-side fallback gains. Gazebo's physical PID is configured above.
+    gains:
+      shoulder_pan:
+        p: 5.0
+        i: 0.0
+        d: 0.1
+        i_clamp: 1.0
+      shoulder_lift:
+        p: 5.0
+        i: 0.0
+        d: 0.1
+        i_clamp: 1.0
+      elbow_flex:
+        p: 5.0
+        i: 0.0
+        d: 0.1
+        i_clamp: 1.0
+      wrist_flex:
+        p: 3.0
+        i: 0.0
+        d: 0.05
+        i_clamp: 0.5
+      wrist_roll:
+        p: 2.0
+        i: 0.0
+        d: 0.02
+        i_clamp: 0.5
+      gripper:
+        p: 1.0
+        i: 0.0
+        d: 0.01
+        i_clamp: 0.3

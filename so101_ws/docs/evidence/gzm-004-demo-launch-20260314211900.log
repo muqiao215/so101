@@ -1,0 +1,241 @@
+[INFO] [launch]: All log files can be found below /home/muqiao/dev/ros2/workspaces/so101_ws/.vscode/.runtime/gzm004/ros_logs/2026-03-14-21-19-01-290369-muqiao-196269
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [196274]
+[INFO] [bash-2]: process started with pid [196276]
+[robot_state_publisher-1] getifaddrs: Operation not permitted
+[robot_state_publisher-1] getifaddrs: Operation not permitted
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.009 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create segment ed939986717e384e: Permission denied[34;1m -> Function [36mcompute_per_allocation_extra_size[m
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.009 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create Shared Memory Manager for domain fastrtps: Permission denied[34;1m -> Function [36mcreate[m
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.009 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUnable to Register SHM Transport. SHM Transport is not supported in the current platform.[34;1m -> Function [36mRTPSParticipantImpl[m
+[robot_state_publisher-1] getifaddrs: Operation not permitted
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.010 [31;1m[[37;1mTRANSPORT_UDP[31;1m Error] [37mError creating socket: Operation not permitted[34;1m -> Function [36minit[m
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.010 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUser transport failed to register.[34;1m -> Function [36mRTPSParticipantImpl[m
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.010 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mCannot create participant due to initialization error[34;1m -> Function [36mcreateParticipant[m
+[robot_state_publisher-1] [37;1m2026-03-14 21:19:02.010 [31;1m[[37;1mDOMAIN_PARTICIPANT[31;1m Error] [37mProblem creating RTPSParticipant[34;1m -> Function [36menable[m
+[robot_state_publisher-1] 
+[robot_state_publisher-1] >>> [rcutils|error_handling.c:108] rcutils_set_error_state()
+[robot_state_publisher-1] This error state is being overwritten:
+[robot_state_publisher-1] 
+[robot_state_publisher-1]   '__create_participant failed to create participant, at ./src/participant.cpp:105, at ./src/rcl/node.c:263'
+[robot_state_publisher-1] 
+[robot_state_publisher-1] with this new error message:
+[robot_state_publisher-1] 
+[robot_state_publisher-1]   'rcl node's rmw handle is invalid, at ./src/rcl/node.c:415'
+[robot_state_publisher-1] 
+[robot_state_publisher-1] rcutils_reset_error() should be called after error handling to avoid this.
+[robot_state_publisher-1] <<<
+[robot_state_publisher-1] [ERROR] [1773494342.010600876] [rcl]: Failed to fini publisher for node: 1
+[robot_state_publisher-1] terminate called after throwing an instance of 'rclcpp::exceptions::RCLError'
+[robot_state_publisher-1]   what():  failed to initialize rcl node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[INFO] [bash-2]: process has finished cleanly [pid 196276]
+[ERROR] [robot_state_publisher-1]: process has died [pid 196274, exit code -6, cmd '/opt/ros/humble/lib/robot_state_publisher/robot_state_publisher --ros-args --params-file /tmp/launch_params_e7kv08eo --params-file /tmp/launch_params_15ctzz9m'].
+[INFO] [gzserver-3]: process started with pid [196304]
+[gzserver-3] Error opening log file: "/home/muqiao/.gazebo/server-11345/gzserver.log"
+[gzserver-3] Gazebo multi-robot simulator, version 11.10.2
+[gzserver-3] Copyright (C) 2012 Open Source Robotics Foundation.
+[gzserver-3] Released under the Apache 2 License.
+[gzserver-3] http://gazebosim.org
+[gzserver-3] 
+[gzserver-3] getifaddres: Operation not permitted
+[gzserver-3] [1;31m[Err] [Connection.cc:744] [0m[1;31mEXCEPTION: [0m[1;31mUnable to get local interface addresses
+[gzserver-3] [0m[1;31m
+[gzserver-3] [0m[1;31m[0m[1;31m[0m[1;31m[Err] [Connection.cc:744] [0m[1;31mEXCEPTION: [0m[1;31mUnable to get local interface addresses
+[gzserver-3] [0m[1;31m
+[ERROR] [gzserver-3]: process has died [pid 196304, exit code 255, cmd 'gzserver /home/muqiao/dev/ros2/workspaces/so101_ws/install/so101_gazebo/share/so101_gazebo/worlds/so101_workcell.world --verbose -slibgazebo_ros_init.so -slibgazebo_ros_factory.so -slibgazebo_ros_force_system.so'].
+[gzserver-3] [1;36m[0m[1;32m[0m
+[gzserver-3] [0m[1;31m[0m[1;31m[0m[1;33m[0m[1;31m[0m
+[INFO] [spawn_entity.py-4]: process started with pid [196329]
+[spawn_entity.py-4] getifaddrs: Operation not permitted
+[spawn_entity.py-4] getifaddrs: Operation not permitted
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create segment a8ac4b83a3f1cc5c: Permission denied[34;1m -> Function [36mcompute_per_allocation_extra_size[m
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create Shared Memory Manager for domain fastrtps: Permission denied[34;1m -> Function [36mcreate[m
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUnable to Register SHM Transport. SHM Transport is not supported in the current platform.[34;1m -> Function [36mRTPSParticipantImpl[m
+[spawn_entity.py-4] getifaddrs: Operation not permitted
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mTRANSPORT_UDP[31;1m Error] [37mError creating socket: Operation not permitted[34;1m -> Function [36minit[m
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUser transport failed to register.[34;1m -> Function [36mRTPSParticipantImpl[m
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mCannot create participant due to initialization error[34;1m -> Function [36mcreateParticipant[m
+[spawn_entity.py-4] [37;1m2026-03-14 21:19:06.311 [31;1m[[37;1mDOMAIN_PARTICIPANT[31;1m Error] [37mProblem creating RTPSParticipant[34;1m -> Function [36menable[m
+[spawn_entity.py-4] 
+[spawn_entity.py-4] >>> [rcutils|error_handling.c:108] rcutils_set_error_state()
+[spawn_entity.py-4] This error state is being overwritten:
+[spawn_entity.py-4] 
+[spawn_entity.py-4]   '__create_participant failed to create participant, at ./src/participant.cpp:105, at ./src/rcl/node.c:263'
+[spawn_entity.py-4] 
+[spawn_entity.py-4] with this new error message:
+[spawn_entity.py-4] 
+[spawn_entity.py-4]   'rcl node's rmw handle is invalid, at ./src/rcl/node.c:415'
+[spawn_entity.py-4] 
+[spawn_entity.py-4] rcutils_reset_error() should be called after error handling to avoid this.
+[spawn_entity.py-4] <<<
+[spawn_entity.py-4] [ERROR] [1773494346.311915263] [rcl]: Failed to fini publisher for node: 1
+[spawn_entity.py-4] Traceback (most recent call last):
+[spawn_entity.py-4]   File "/opt/ros/humble/lib/gazebo_ros/spawn_entity.py", line 372, in <module>
+[spawn_entity.py-4]     main()
+[spawn_entity.py-4]   File "/opt/ros/humble/lib/gazebo_ros/spawn_entity.py", line 365, in main
+[spawn_entity.py-4]     spawn_entity_node = SpawnEntityNode(args_without_ros)
+[spawn_entity.py-4]   File "/opt/ros/humble/lib/gazebo_ros/spawn_entity.py", line 52, in __init__
+[spawn_entity.py-4]     super().__init__('spawn_entity')
+[spawn_entity.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py", line 175, in __init__
+[spawn_entity.py-4]     self.__node = _rclpy.Node(
+[spawn_entity.py-4] rclpy._rclpy_pybind11.RCLError: error creating node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[spawn_entity.py-4] Error in sys.excepthook:
+[spawn_entity.py-4] Traceback (most recent call last):
+[spawn_entity.py-4]   File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 153, in apport_excepthook
+[spawn_entity.py-4]     with os.fdopen(os.open(pr_filename,
+[spawn_entity.py-4] PermissionError: [Errno 13] Permission denied: '/var/crash/_opt_ros_humble_lib_gazebo_ros_spawn_entity.py.1000.crash'
+[spawn_entity.py-4] 
+[spawn_entity.py-4] Original exception was:
+[spawn_entity.py-4] Traceback (most recent call last):
+[spawn_entity.py-4]   File "/opt/ros/humble/lib/gazebo_ros/spawn_entity.py", line 372, in <module>
+[spawn_entity.py-4]     main()
+[spawn_entity.py-4]   File "/opt/ros/humble/lib/gazebo_ros/spawn_entity.py", line 365, in main
+[spawn_entity.py-4]     spawn_entity_node = SpawnEntityNode(args_without_ros)
+[spawn_entity.py-4]   File "/opt/ros/humble/lib/gazebo_ros/spawn_entity.py", line 52, in __init__
+[spawn_entity.py-4]     super().__init__('spawn_entity')
+[spawn_entity.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py", line 175, in __init__
+[spawn_entity.py-4]     self.__node = _rclpy.Node(
+[spawn_entity.py-4] rclpy._rclpy_pybind11.RCLError: error creating node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[ERROR] [spawn_entity.py-4]: process has died [pid 196329, exit code 1, cmd '/opt/ros/humble/lib/gazebo_ros/spawn_entity.py -topic robot_description -entity so101 -x 0.0 -y 0.0 -z 0.80 -timeout 30 --ros-args'].
+[INFO] [spawner-5]: process started with pid [196424]
+[spawner-5] getifaddrs: Operation not permitted
+[spawner-5] getifaddrs: Operation not permitted
+[spawner-5] [37;1m2026-03-14 21:19:34.184 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create segment 888ed1339cc93475: Permission denied[34;1m -> Function [36mcompute_per_allocation_extra_size[m
+[spawner-5] [37;1m2026-03-14 21:19:34.184 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create Shared Memory Manager for domain fastrtps: Permission denied[34;1m -> Function [36mcreate[m
+[spawner-5] [37;1m2026-03-14 21:19:34.184 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUnable to Register SHM Transport. SHM Transport is not supported in the current platform.[34;1m -> Function [36mRTPSParticipantImpl[m
+[spawner-5] [37;1m2026-03-14 21:19:34.184 [31;1m[[37;1mTRANSPORT_UDP[31;1m Error] [37mError creating socket: Operation not permitted[34;1m -> Function [36minit[m
+[spawner-5] [37;1m2026-03-14 21:19:34.184 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUser transport failed to register.[34;1m -> Function [36mRTPSParticipantImpl[m
+[spawner-5] [37;1m2026-03-14 21:19:34.184 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mCannot create participant due to initialization error[34;1m -> Function [36mcreateParticipant[m
+[spawner-5] [37;1m2026-03-14 21:19:34.185 [31;1m[[37;1mDOMAIN_PARTICIPANT[31;1m Error] [37mProblem creating RTPSParticipant[34;1m -> Function [36menable[m
+[spawner-5] getifaddrs: Operation not permitted
+[spawner-5] 
+[spawner-5] >>> [rcutils|error_handling.c:108] rcutils_set_error_state()
+[spawner-5] This error state is being overwritten:
+[spawner-5] 
+[spawner-5]   '__create_participant failed to create participant, at ./src/participant.cpp:105, at ./src/rcl/node.c:263'
+[spawner-5] 
+[spawner-5] with this new error message:
+[spawner-5] 
+[spawner-5]   'rcl node's rmw handle is invalid, at ./src/rcl/node.c:415'
+[spawner-5] 
+[spawner-5] rcutils_reset_error() should be called after error handling to avoid this.
+[spawner-5] <<<
+[spawner-5] [ERROR] [1773494374.185136205] [rcl]: Failed to fini publisher for node: 1
+[spawner-5] Traceback (most recent call last):
+[spawner-5]   File "/opt/ros/humble/lib/controller_manager/spawner", line 33, in <module>
+[spawner-5]     sys.exit(load_entry_point('controller-manager==2.52.2', 'console_scripts', 'spawner')())
+[spawner-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/controller_manager/spawner.py", line 174, in main
+[spawner-5]     node = Node("spawner_" + controller_names[0])
+[spawner-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py", line 175, in __init__
+[spawner-5]     self.__node = _rclpy.Node(
+[spawner-5] rclpy._rclpy_pybind11.RCLError: error creating node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[spawner-5] Error in sys.excepthook:
+[spawner-5] Traceback (most recent call last):
+[spawner-5]   File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 153, in apport_excepthook
+[spawner-5]     with os.fdopen(os.open(pr_filename,
+[spawner-5] PermissionError: [Errno 13] Permission denied: '/var/crash/_opt_ros_humble_lib_controller_manager_spawner.1000.crash'
+[spawner-5] 
+[spawner-5] Original exception was:
+[spawner-5] Traceback (most recent call last):
+[spawner-5]   File "/opt/ros/humble/lib/controller_manager/spawner", line 33, in <module>
+[spawner-5]     sys.exit(load_entry_point('controller-manager==2.52.2', 'console_scripts', 'spawner')())
+[spawner-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/controller_manager/spawner.py", line 174, in main
+[spawner-5]     node = Node("spawner_" + controller_names[0])
+[spawner-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py", line 175, in __init__
+[spawner-5]     self.__node = _rclpy.Node(
+[spawner-5] rclpy._rclpy_pybind11.RCLError: error creating node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[ERROR] [spawner-5]: process has died [pid 196424, exit code 1, cmd '/opt/ros/humble/lib/controller_manager/spawner joint_state_broadcaster --controller-manager /controller_manager --controller-manager-timeout 120 --ros-args'].
+[INFO] [spawner-6]: process started with pid [196446]
+[spawner-6] getifaddrs: Operation not permitted
+[spawner-6] getifaddrs: Operation not permitted
+[spawner-6] [37;1m2026-03-14 21:19:34.653 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create segment 4c381481f0c9841d: Permission denied[34;1m -> Function [36mcompute_per_allocation_extra_size[m
+[spawner-6] [37;1m2026-03-14 21:19:34.653 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create Shared Memory Manager for domain fastrtps: Permission denied[34;1m -> Function [36mcreate[m
+[spawner-6] [37;1m2026-03-14 21:19:34.653 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUnable to Register SHM Transport. SHM Transport is not supported in the current platform.[34;1m -> Function [36mRTPSParticipantImpl[m
+[spawner-6] [37;1m2026-03-14 21:19:34.653 [31;1m[[37;1mTRANSPORT_UDP[31;1m Error] [37mError creating socket: Operation not permitted[34;1m -> Function [36minit[m
+[spawner-6] [37;1m2026-03-14 21:19:34.653 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUser transport failed to register.[34;1m -> Function [36mRTPSParticipantImpl[m
+[spawner-6] [37;1m2026-03-14 21:19:34.653 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mCannot create participant due to initialization error[34;1m -> Function [36mcreateParticipant[m
+[spawner-6] getifaddrs: Operation not permitted
+[spawner-6] 
+[spawner-6] >>> [rcutils|error_handling.c:108] rcutils_set_error_state()
+[spawner-6] This error state is being overwritten:
+[spawner-6] 
+[spawner-6]   '__create_participant failed to create participant, at ./src/participant.cpp:105, at ./src/rcl/node.c:263'
+[spawner-6] 
+[spawner-6] with this new error message:
+[spawner-6] 
+[spawner-6]   'rcl node's rmw handle is invalid, at ./src/rcl/node.c:415'
+[spawner-6] 
+[spawner-6] rcutils_reset_error() should be called after error handling to avoid this.
+[spawner-6] <<<
+[spawner-6] [ERROR] [1773494374.654217105] [rcl]: Failed to fini publisher for node: 1
+[spawner-6] [37;1m2026-03-14 21:19:34.654 [31;1m[[37;1mDOMAIN_PARTICIPANT[31;1m Error] [37mProblem creating RTPSParticipant[34;1m -> Function [36menable[m
+[spawner-6] Traceback (most recent call last):
+[spawner-6]   File "/opt/ros/humble/lib/controller_manager/spawner", line 33, in <module>
+[spawner-6]     sys.exit(load_entry_point('controller-manager==2.52.2', 'console_scripts', 'spawner')())
+[spawner-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/controller_manager/spawner.py", line 174, in main
+[spawner-6]     node = Node("spawner_" + controller_names[0])
+[spawner-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py", line 175, in __init__
+[spawner-6]     self.__node = _rclpy.Node(
+[spawner-6] rclpy._rclpy_pybind11.RCLError: error creating node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[spawner-6] Error in sys.excepthook:
+[spawner-6] Traceback (most recent call last):
+[spawner-6]   File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 153, in apport_excepthook
+[spawner-6]     with os.fdopen(os.open(pr_filename,
+[spawner-6] PermissionError: [Errno 13] Permission denied: '/var/crash/_opt_ros_humble_lib_controller_manager_spawner.1000.crash'
+[spawner-6] 
+[spawner-6] Original exception was:
+[spawner-6] Traceback (most recent call last):
+[spawner-6]   File "/opt/ros/humble/lib/controller_manager/spawner", line 33, in <module>
+[spawner-6]     sys.exit(load_entry_point('controller-manager==2.52.2', 'console_scripts', 'spawner')())
+[spawner-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/controller_manager/spawner.py", line 174, in main
+[spawner-6]     node = Node("spawner_" + controller_names[0])
+[spawner-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py", line 175, in __init__
+[spawner-6]     self.__node = _rclpy.Node(
+[spawner-6] rclpy._rclpy_pybind11.RCLError: error creating node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[ERROR] [spawner-6]: process has died [pid 196446, exit code 1, cmd '/opt/ros/humble/lib/controller_manager/spawner joint_trajectory_controller --controller-manager /controller_manager --controller-manager-timeout 120 --ros-args'].
+[INFO] [move_group-7]: process started with pid [196466]
+[move_group-7] getifaddrs: Operation not permitted
+[move_group-7] getifaddrs: Operation not permitted
+[move_group-7] getifaddrs: Operation not permitted
+[move_group-7] [37;1m2026-03-14 21:19:34.975 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create segment 8382c843fa4052c8: Permission denied[34;1m -> Function [36mcompute_per_allocation_extra_size[m
+[move_group-7] [37;1m2026-03-14 21:19:34.975 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed to create Shared Memory Manager for domain fastrtps: Permission denied[34;1m -> Function [36mcreate[m
+[move_group-7] [37;1m2026-03-14 21:19:34.975 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUnable to Register SHM Transport. SHM Transport is not supported in the current platform.[34;1m -> Function [36mRTPSParticipantImpl[m
+[move_group-7] [37;1m2026-03-14 21:19:34.975 [31;1m[[37;1mTRANSPORT_UDP[31;1m Error] [37mError creating socket: Operation not permitted[34;1m -> Function [36minit[m
+[move_group-7] [37;1m2026-03-14 21:19:34.975 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mUser transport failed to register.[34;1m -> Function [36mRTPSParticipantImpl[m
+[move_group-7] [37;1m2026-03-14 21:19:34.975 [31;1m[[37;1mRTPS_PARTICIPANT[31;1m Error] [37mCannot create participant due to initialization error[34;1m -> Function [36mcreateParticipant[m
+[move_group-7] [37;1m2026-03-14 21:19:34.976 [31;1m[[37;1mDOMAIN_PARTICIPANT[31;1m Error] [37mProblem creating RTPSParticipant[34;1m -> Function [36menable[m
+[move_group-7] 
+[move_group-7] >>> [rcutils|error_handling.c:108] rcutils_set_error_state()
+[move_group-7] This error state is being overwritten:
+[move_group-7] 
+[move_group-7]   '__create_participant failed to create participant, at ./src/participant.cpp:105, at ./src/rcl/node.c:263'
+[move_group-7] 
+[move_group-7] with this new error message:
+[move_group-7] 
+[move_group-7]   'rcl node's rmw handle is invalid, at ./src/rcl/node.c:415'
+[move_group-7] 
+[move_group-7] rcutils_reset_error() should be called after error handling to avoid this.
+[move_group-7] <<<
+[move_group-7] [ERROR] [1773494374.976307367] [rcl]: Failed to fini publisher for node: 1
+[move_group-7] terminate called after throwing an instance of 'rclcpp::exceptions::RCLError'
+[move_group-7]   what():  failed to initialize rcl node: rcl node's rmw handle is invalid, at ./src/rcl/node.c:415
+[move_group-7] Stack trace (most recent call last):
+[move_group-7] #15   Object "", at 0xffffffffffffffff, in 
+[move_group-7] #14   Object "/opt/ros/humble/lib/moveit_ros_move_group/move_group", at 0x61fe30eb0724, in 
+[move_group-7] #13   Source "../csu/libc-start.c", line 392, in __libc_start_main_impl [0x7d7974429e3f]
+[move_group-7] #12   Source "../sysdeps/nptl/libc_start_call_main.h", line 58, in __libc_start_call_main [0x7d7974429d8f]
+[move_group-7] #11   Object "/opt/ros/humble/lib/moveit_ros_move_group/move_group", at 0x61fe30eae9a6, in 
+[move_group-7] #10   Object "/opt/ros/humble/lib/librclcpp.so", at 0x7d7974cbb467, in rclcpp::Node::Node(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::NodeOptions const&)
+[move_group-7] #9    Object "/opt/ros/humble/lib/librclcpp.so", at 0x7d7974cba236, in rclcpp::Node::Node(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::NodeOptions const&)
+[move_group-7] #8    Object "/opt/ros/humble/lib/librclcpp.so", at 0x7d7974cc2550, in rclcpp::node_interfaces::NodeBase::NodeBase(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::shared_ptr<rclcpp::Context>, rcl_node_options_s const&, bool, bool)
+[move_group-7] #7    Object "/opt/ros/humble/lib/librclcpp.so", at 0x7d7974c9b548, in rclcpp::exceptions::throw_from_rcl_error(int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rcutils_error_state_s const*, void (*)())
+[move_group-7] #6    Object "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30", at 0x7d79748ae1fd, in std::rethrow_exception(std::__exception_ptr::exception_ptr)
+[move_group-7] #5    Object "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30", at 0x7d79748ae276, in std::terminate()
+[move_group-7] #4    Object "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30", at 0x7d79748ae20b, in 
+[move_group-7] #3    Object "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30", at 0x7d79748a2b9d, in 
+[move_group-7] #2    Source "./stdlib/abort.c", line 79, in abort [0x7d79744287f2]
+[move_group-7] #1    Source "../sysdeps/posix/raise.c", line 26, in raise [0x7d7974442475]
+[move_group-7] #0  | Source "./nptl/pthread_kill.c", line 89, in __pthread_kill_internal
+[move_group-7]     | Source "./nptl/pthread_kill.c", line 78, in __pthread_kill_implementation
+[move_group-7]       Source "./nptl/pthread_kill.c", line 44, in __pthread_kill [0x7d79744969fc]
+[move_group-7] Aborted (Signal sent by tkill() 196466 1000)
+[ERROR] [move_group-7]: process has died [pid 196466, exit code -6, cmd '/opt/ros/humble/lib/moveit_ros_move_group/move_group --ros-args --params-file /tmp/launch_params_p9on8ust --params-file /tmp/launch_params_gscvchwf --params-file /tmp/launch_params_qhgn94hq --params-file /tmp/launch_params_3rbxx3s5 --params-file /tmp/launch_params_uojslvu7 --params-file /tmp/launch_params_5klj8itn --params-file /tmp/launch_params_hm7qvmwn --params-file /tmp/launch_params_30z4y9xr'].

@@ -1,0 +1,13 @@
+{
+  "adapterId": "so101-real-hardware",
+  "source": {
+    "type": "file",
+    "path": "${SO101_REAL_HW_STATUS_PATH}"
+  },
+  "gate": {
+    "enabled": false,
+    "reasonCode": "HWS_002_PENDING",
+    "reason": "HWS-002 未通过，默认锁执行",
+    "source": "so101-real-hardware"
+  }
+}

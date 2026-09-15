@@ -1,0 +1,15 @@
+[INFO] [launch]: All log files can be found below /home/muqiao/dev/ros2/workspaces/so101_ws/.vscode/.runtime/r2c003/ros_logs/2026-03-14-20-25-14-412999-muqiao-186723
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [186742]
+[INFO] [python3-2]: process started with pid [186744]
+[robot_state_publisher-1] [WARN] [1773491114.771968861] [kdl_parser]: The root link base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-1] [INFO] [1773491114.772203740] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-1] [INFO] [1773491114.772339761] [robot_state_publisher]: got segment gripper_frame_link
+[robot_state_publisher-1] [INFO] [1773491114.772362922] [robot_state_publisher]: got segment gripper_link
+[robot_state_publisher-1] [INFO] [1773491114.772373015] [robot_state_publisher]: got segment lower_arm_link
+[robot_state_publisher-1] [INFO] [1773491114.772381488] [robot_state_publisher]: got segment moving_jaw_so101_v1_link
+[robot_state_publisher-1] [INFO] [1773491114.772390413] [robot_state_publisher]: got segment shoulder_link
+[robot_state_publisher-1] [INFO] [1773491114.772398864] [robot_state_publisher]: got segment upper_arm_link
+[robot_state_publisher-1] [INFO] [1773491114.772407160] [robot_state_publisher]: got segment wrist_link
+[python3-2] [INFO] [1773491115.000452392] [so101_task_executor]: Task executor ready. Loaded templates: ['pick_place_default', 'pick_place_red', 'pick_place_blue']
+[python3-2] [INFO] [1773491115.000925949] [so101_task_executor]: Detection trigger: enabled=True, conf>=0.50, cooldown=8.0s, map={'red': 'pick_place_red', 'blue': 'pick_place_blue'}

@@ -1,0 +1,31 @@
+.omx/
+.vscode/.runtime/
+build/
+install/
+log/
+mes_frontend/node_modules/
+mes_frontend/dist/
+mes_backend/target/
+tools/hardware/real_hardware_calibration.local.json
+*.pyc
+__pycache__/
+
+# Generated smoke artifacts: keep selected manifests/reports with `git add -f`,
+# but do not accidentally commit reproducible images, logs, model weights, or parquet payloads.
+docs/generated/vision-episodes/**/events.jsonl
+docs/generated/vision-episodes/**/images/
+docs/generated/vision-episodes/**/dataset/**/images/
+docs/generated/vision-episodes/**/dataset/*.jsonl
+docs/generated/vision-episodes/**/dataset/lerobot-candidate*/debug_samples.jsonl
+docs/generated/vision-episodes/**/dataset/lerobot-candidate*/rejected_samples.jsonl
+docs/generated/vision-episodes/**/dataset/lerobot-candidate*/train_samples.jsonl
+docs/generated/vision-episodes/**/dataset/lerobot-native*/sidecars/
+docs/generated/vision-episodes/**/dataset/yolo-dataset/labels/
+docs/generated/vision-episodes/**/dataset/yolo-dataset/labels/*.cache
+docs/generated/vision-episodes/**/dataset/lerobot-native*/data/
+docs/generated/vision-episodes/**/dataset/lerobot-native*/meta/**/*.parquet
+docs/generated/vision-episodes/gzv005_*/
+docs/generated/vision-episodes/gzv010_*/
+docs/generated/vision-episodes/lerobot-v3-uvrun-freeze.txt
+docs/generated/yolo-smoke/**/predict-source/
+docs/generated/yolo-smoke/**/ultralytics-runs/

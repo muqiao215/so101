@@ -1,0 +1,8 @@
+[robot_state_publisher-2] [INFO] [1773492098.192621682] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1773492098.192711264] [robot_state_publisher]: got segment gripper_frame_link
+[robot_state_publisher-2] [INFO] [1773492098.192724172] [robot_state_publisher]: got segment gripper_link
+[robot_state_publisher-2] [INFO] [1773492098.192729491] [robot_state_publisher]: got segment lower_arm_link
+[robot_state_publisher-2] [INFO] [1773492098.192734230] [robot_state_publisher]: got segment moving_jaw_so101_v1_link
+[robot_state_publisher-2] [INFO] [1773492098.192739064] [robot_state_publisher]: got segment shoulder_link
+[robot_state_publisher-2] [INFO] [1773492098.192743243] [robot_state_publisher]: got segment upper_arm_link
+[robot_state_publisher-2] [INFO] [1773492098.192747549] [robot_state_publisher]: got segment wrist_link

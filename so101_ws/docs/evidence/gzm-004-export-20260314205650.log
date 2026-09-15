@@ -1,0 +1,2 @@
+[ERROR] [1773493066.626445498] [pick_place_runner]: MoveGroup action server '/move_action' not available.
+[ros2run]: Process exited with failure 2

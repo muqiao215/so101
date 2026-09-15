@@ -1,0 +1,111 @@
+[INFO] [launch]: All log files can be found below /home/muqiao/dev/ros2/workspaces/so101_ws/.vscode/.runtime/gzm004/ros_logs/2026-03-14-20-56-52-806184-muqiao-192307
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [bash-1]: process started with pid [192319]
+[INFO] [robot_state_publisher-2]: process started with pid [192321]
+[INFO] [bash-1]: process has finished cleanly [pid 192319]
+[robot_state_publisher-2] [WARN] [1773493015.319781787] [kdl_parser]: The root link base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-2] [INFO] [1773493015.320101393] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1773493015.320318697] [robot_state_publisher]: got segment gripper_frame_link
+[robot_state_publisher-2] [INFO] [1773493015.320335483] [robot_state_publisher]: got segment gripper_link
+[robot_state_publisher-2] [INFO] [1773493015.320348431] [robot_state_publisher]: got segment lower_arm_link
+[robot_state_publisher-2] [INFO] [1773493015.320364272] [robot_state_publisher]: got segment moving_jaw_so101_v1_link
+[robot_state_publisher-2] [INFO] [1773493015.320374509] [robot_state_publisher]: got segment shoulder_link
+[robot_state_publisher-2] [INFO] [1773493015.320382456] [robot_state_publisher]: got segment upper_arm_link
+[robot_state_publisher-2] [INFO] [1773493015.320391135] [robot_state_publisher]: got segment wrist_link
+[INFO] [gzserver-3]: process started with pid [192351]
+[gzserver-3] Gazebo multi-robot simulator, version 11.10.2
+[gzserver-3] Copyright (C) 2012 Open Source Robotics Foundation.
+[gzserver-3] Released under the Apache 2 License.
+[gzserver-3] http://gazebosim.org
+[gzserver-3] 
+[gzserver-3] [1;33m[Wrn] [gazebo_ros_init.cpp:178] [0m[1;33m
+[gzserver-3] #     # ####### ####### ###  #####  #######
+[gzserver-3] ##    # #     #    #     #  #     # #
+[gzserver-3] # #   # #     #    #     #  #       #
+[gzserver-3] #  #  # #     #    #     #  #       #####
+[gzserver-3] #   # # #     #    #     #  #       #
+[gzserver-3] #    ## #     #    #     #  #     # #
+[gzserver-3] #     # #######    #    ###  #####  #######
+[gzserver-3] 
+[gzserver-3] This version of Gazebo, now called Gazebo classic, reaches end-of-life
+[gzserver-3] in January 2025. Users are highly encouraged to migrate to the new Gazebo
+[gzserver-3] using our migration guides (https://gazebosim.org/docs/latest/gazebo_classic_migration?utm_source=gazebo_ros_pkgs&utm_medium=cli)
+[gzserver-3] 
+[gzserver-3] [0m[1;33m
+[gzserver-3] [1;32m[Msg] [0m[1;32mWaiting for master.[0m[1;32m
+[gzserver-3] [0m[1;32m[0m[1;32m[0m[1;32m[Msg] [0m[1;32mConnected to gazebo master @ [0m[1;32mhttp://127.0.0.1:11345[0m[1;32m
+[gzserver-3] [0m[1;32m[0m[1;32m[0m[1;32m[Msg] [0m[1;32mPublicized address: [0m[1;32m10.255.255.254[0m[1;32m
+[gzserver-3] [0m[1;33m[0m[1;33m[0m[1;31m[Err] [RTShaderSystem.cc:480] [0m[1;31mUnable to find shader lib. Shader generating will fail. [0m[1;31mYour GAZEBO_RESOURCE_PATH is probably improperly set. [0m[1;31mHave you sourced <prefix>/share/gazebo/setup.bash?
+[INFO] [spawn_entity.py-4]: process started with pid [192453]
+[spawn_entity.py-4] [INFO] [1773493020.349771488] [spawn_entity]: Spawn Entity started
+[spawn_entity.py-4] [INFO] [1773493020.350373135] [spawn_entity]: Loading entity published on topic robot_description
+[spawn_entity.py-4] [INFO] [1773493020.354839837] [spawn_entity]: Waiting for entity xml on robot_description
+[spawn_entity.py-4] [INFO] [1773493020.940430650] [spawn_entity]: Waiting for service /spawn_entity, timeout = 30
+[spawn_entity.py-4] [INFO] [1773493020.941056446] [spawn_entity]: Waiting for service /spawn_entity
+[INFO] [ros2-5]: process started with pid [192497]
+[gzserver-3] [0mALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+[gzserver-3] ALSA lib conf.c:5178:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+[gzserver-3] ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+[gzserver-3] ALSA lib conf.c:5178:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+[gzserver-3] ALSA lib confmisc.c:1334:(snd_func_refer) error evaluating name
+[gzserver-3] ALSA lib conf.c:5178:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+[gzserver-3] ALSA lib conf.c:5701:(snd_config_expand) Evaluate error: No such file or directory
+[gzserver-3] ALSA lib pcm.c:2664:(snd_pcm_open_noupdate) Unknown PCM default
+[gzserver-3] AL lib: (EE) ALCplaybackAlsa_open: Could not open playback device 'default': No such file or directory
+[gzserver-3] [1;31m[Err] [OpenAL.cc:84] [0m[1;31mUnable to open audio device[[0m[1;31mdefault[0m[1;31m]
+[gzserver-3]  Audio will be disabled.
+[gzserver-3] [0m[1;32m[0m[1;32m[0m[1;32m[Msg] [0m[1;32mLoading world file [[0m[1;32m/home/muqiao/dev/ros2/workspaces/so101_ws/install/so101_gazebo/share/so101_gazebo/worlds/so101_workcell.world[0m[1;32m][0m[1;32m
+[spawn_entity.py-4] [INFO] [1773493046.429305774] [spawn_entity]: Calling service /spawn_entity
+[spawn_entity.py-4] [INFO] [1773493046.699883709] [spawn_entity]: Spawn status: SpawnEntity: Successfully spawned entity [so101]
+[gzserver-3] [0m[INFO] [1773493046.718607147] [gazebo_ros2_control]: Loading gazebo_ros2_control plugin
+[gzserver-3] [INFO] [1773493046.725156610] [gazebo_ros2_control]: Starting gazebo_ros2_control plugin in namespace: /
+[gzserver-3] [INFO] [1773493046.725528148] [gazebo_ros2_control]: Starting gazebo_ros2_control plugin in ros 2 node: gazebo_ros2_control
+[gzserver-3] [INFO] [1773493046.730101460] [gazebo_ros2_control]: connected to service!! robot_state_publisher
+[gzserver-3] [INFO] [1773493046.731000068] [gazebo_ros2_control]: Received urdf from param server, parsing...
+[gzserver-3] [INFO] [1773493046.732178944] [gazebo_ros2_control]: Loading parameter files /home/muqiao/dev/ros2/workspaces/so101_ws/install/so101_bringup/share/so101_bringup/config/controllers.yaml
+[gzserver-3] [INFO] [1773493046.742430752] [gazebo_ros2_control]: Loading joint: shoulder_pan
+[gzserver-3] [INFO] [1773493046.742503490] [gazebo_ros2_control]: 	State:
+[gzserver-3] [INFO] [1773493046.742524606] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.742537853] [gazebo_ros2_control]: 		 velocity
+[gzserver-3] [INFO] [1773493046.742556302] [gazebo_ros2_control]: 	Command:
+[gzserver-3] [INFO] [1773493046.742564965] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.742778683] [gazebo_ros2_control]: Loading joint: shoulder_lift
+[gzserver-3] [INFO] [1773493046.742803711] [gazebo_ros2_control]: 	State:
+[gzserver-3] [INFO] [1773493046.742813255] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.742821576] [gazebo_ros2_control]: 		 velocity
+[gzserver-3] [INFO] [1773493046.742830206] [gazebo_ros2_control]: 	Command:
+[gzserver-3] [INFO] [1773493046.742837920] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.743011963] [gazebo_ros2_control]: Loading joint: elbow_flex
+[gzserver-3] [INFO] [1773493046.743028153] [gazebo_ros2_control]: 	State:
+[gzserver-3] [INFO] [1773493046.743034038] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.743040386] [gazebo_ros2_control]: 		 velocity
+[gzserver-3] [INFO] [1773493046.743045775] [gazebo_ros2_control]: 	Command:
+[gzserver-3] [INFO] [1773493046.743051076] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.743530674] [gazebo_ros2_control]: Loading joint: wrist_flex
+[gzserver-3] [INFO] [1773493046.743551019] [gazebo_ros2_control]: 	State:
+[gzserver-3] [INFO] [1773493046.743557763] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.743563748] [gazebo_ros2_control]: 		 velocity
+[gzserver-3] [INFO] [1773493046.743568961] [gazebo_ros2_control]: 	Command:
+[gzserver-3] [INFO] [1773493046.743574306] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.743789368] [gazebo_ros2_control]: Loading joint: wrist_roll
+[gzserver-3] [INFO] [1773493046.743807090] [gazebo_ros2_control]: 	State:
+[gzserver-3] [INFO] [1773493046.743813515] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.743830300] [gazebo_ros2_control]: 		 velocity
+[gzserver-3] [INFO] [1773493046.743835844] [gazebo_ros2_control]: 	Command:
+[gzserver-3] [INFO] [1773493046.743843107] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.744126400] [gazebo_ros2_control]: Loading joint: gripper
+[gzserver-3] [INFO] [1773493046.744145080] [gazebo_ros2_control]: 	State:
+[gzserver-3] [INFO] [1773493046.744151450] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.744157137] [gazebo_ros2_control]: 		 velocity
+[gzserver-3] [INFO] [1773493046.744162394] [gazebo_ros2_control]: 	Command:
+[gzserver-3] [INFO] [1773493046.744167838] [gazebo_ros2_control]: 		 position
+[gzserver-3] [INFO] [1773493046.744504418] [resource_manager]: Initialize hardware 'SO101System' 
+[gzserver-3] [INFO] [1773493046.744711954] [resource_manager]: Successful initialization of hardware 'SO101System'
+[gzserver-3] [INFO] [1773493046.744848889] [resource_manager]: 'configure' hardware 'SO101System' 
+[gzserver-3] [INFO] [1773493046.744865409] [resource_manager]: Successful 'configure' of hardware 'SO101System'
+[gzserver-3] [INFO] [1773493046.744872683] [resource_manager]: 'activate' hardware 'SO101System' 
+[gzserver-3] [INFO] [1773493046.744877852] [resource_manager]: Successful 'activate' of hardware 'SO101System'
+[gzserver-3] [INFO] [1773493046.744988182] [gazebo_ros2_control]: Loading controller_manager
+[gzserver-3] [WARN] [1773493046.760808980] [gazebo_ros2_control]:  Desired controller update period (0.01 s) is slower than the gazebo simulation period (0.001 s).
+[gzserver-3] [INFO] [1773493046.761230553] [gazebo_ros2_control]: Loaded gazebo_ros2_control.
+[INFO] [spawn_entity.py-4]: process has finished cleanly [pid 192453]
