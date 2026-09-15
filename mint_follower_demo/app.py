@@ -14,6 +14,7 @@ import os
 import platform
 import re
 import select
+import shlex
 import subprocess
 import sys
 import threading
@@ -44,7 +45,7 @@ try:
 except ImportError:  # pragma: no cover - Python 3 fallback
     from urllib import unquote
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.realpath(__file__))
 CONFIG_DIR = os.path.join(ROOT, "config")
 RECORDINGS_DIR = os.path.join(CONFIG_DIR, "recordings")
 RECORDINGS_TRASH_DIR = os.path.join(RECORDINGS_DIR, ".trash")
@@ -59,17 +60,25 @@ LOG_DIR = os.path.join(ROOT, "logs")
 VISION_DIR = os.path.join(LOG_DIR, "vision")
 VISION_LATEST_IMAGE_PATH = os.path.join(VISION_DIR, "latest.jpg")
 VISION_LATEST_ANNOTATED_PATH = os.path.join(VISION_DIR, "latest_annotated.jpg")
+WORKBENCH_DIR = os.path.abspath(os.path.join(ROOT, ".."))
+ROS2_SCENE_DIR = os.environ.get("SO101_ROS2_SCENE_DIR", os.path.join(WORKBENCH_DIR, "so101_gz_scene"))
+ROS2_WS_SETUP = os.environ.get("SO101_ROS2_WS_SETUP", os.path.join(WORKBENCH_DIR, "workspaces", "so101_ws", "install", "setup.bash"))
+ROS2_BASE_SETUP = os.environ.get("SO101_ROS2_SETUP", "/opt/ros/humble/setup.bash")
+RVIZ_SYNC_LAUNCH = os.path.join(ROS2_SCENE_DIR, "launch_live_follower_rviz.launch.py")
+GZ_DEBUG_LAUNCH = os.path.join(ROS2_SCENE_DIR, "launch_board_with_arms.launch.py")
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "1234"
+ADMIN_PASSWORD = os.environ.get("SO101_ADMIN_PASSWORD", "")
+OPERATOR_PASSWORD = os.environ.get("SO101_OPERATOR_PASSWORD", "")
+MAX_BODY_BYTES = 1024 * 1024
 LOGIN_SESSIONS = {}
 JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
 MANUAL_LIMITS = {
-    "shoulder_pan": (-math.pi, math.pi),
-    "shoulder_lift": (-math.pi, math.pi),
-    "elbow_flex": (-math.pi, math.pi),
-    "wrist_flex": (-math.pi, math.pi),
-    "wrist_roll": (-math.pi, math.pi),
-    "gripper": (0.0, 1.0),
+    "shoulder_pan": (-100.0, 100.0),
+    "shoulder_lift": (-100.0, 100.0),
+    "elbow_flex": (-100.0, 100.0),
+    "wrist_flex": (-100.0, 100.0),
+    "wrist_roll": (-100.0, 100.0),
+    "gripper": (0.0, 100.0),
 }
 STS_MODEL_NUMBER = 777
 STS_MAX_RESOLUTION = 4095
@@ -85,7 +94,7 @@ STS_INST_PING = 1
 STS_INST_READ = 2
 STS_INST_WRITE = 3
 STS_INST_SYNC_WRITE = 131
-VISION_DEFAULT_CAMERA = "/dev/v4l/by-id/usb-Clxet_UVCCamera_12345678-video-index0"
+VISION_DEFAULT_CAMERA = os.environ.get("SO101_CAMERA", "0")
 VISION_DEFAULT_WIDTH = 1280
 VISION_DEFAULT_HEIGHT = 720
 VISION_DEFAULT_WARMUP_FRAMES = 30
@@ -255,7 +264,11 @@ def login_session_from_token(token):
     token = str(token or "").strip()
     if not token:
         return None
-    return LOGIN_SESSIONS.get(token)
+    session = LOGIN_SESSIONS.get(token)
+    if session and now_ms() - session["created_ms"] <= 8 * 3600 * 1000:
+        return session
+    LOGIN_SESSIONS.pop(token, None)
+    return None
 
 
 def login_from_payload(body, user_agent):
@@ -264,10 +277,14 @@ def login_from_payload(body, user_agent):
     raw_operator = re.sub(r"\s+", " ", str(body.get("operator", "")).strip())
     if role == "admin":
         password = str(body.get("password", ""))
-        if raw_operator != ADMIN_USERNAME or password != ADMIN_PASSWORD:
+        import hmac
+        if not ADMIN_PASSWORD or raw_operator != ADMIN_USERNAME or not hmac.compare_digest(password.encode(), ADMIN_PASSWORD.encode()):
             raise ValueError("管理员账号或密码错误")
         operator_name = "管理员"
     else:
+        import hmac
+        if not OPERATOR_PASSWORD or not hmac.compare_digest(str(body.get("password", "")).encode(), OPERATOR_PASSWORD.encode()):
+            raise ValueError("员工密码错误或未配置 SO101_OPERATOR_PASSWORD")
         if not raw_operator:
             raise ValueError("员工姓名不能为空")
         operator_name = raw_operator[:80]
@@ -590,6 +607,22 @@ def parse_float_list(value, count, default_value):
     return result[:count]
 
 
+def resolve_teleop_step_limits(options, serial_config, joint_count):
+    """Resolve step limits while allowing an explicit API/UI value to win."""
+    configured_default = serial_config.get("teleop_max_step_raw", 48.0)
+    max_step_raw = clamp(float(options.get("max_step_raw", configured_default)), 2.0, 200.0)
+    if options.get("step_raw_by_joint") is not None:
+        raw_limits = options.get("step_raw_by_joint")
+    elif "max_step_raw" in options:
+        raw_limits = [max_step_raw] * joint_count
+    else:
+        raw_limits = serial_config.get("teleop_step_raw_by_joint")
+    if raw_limits is None:
+        return max_step_raw, [max_step_raw] * joint_count
+    limits = [clamp(v, 2.0, 200.0) for v in parse_float_list(raw_limits, joint_count, max_step_raw)]
+    return max_step_raw, limits
+
+
 def load_teleop_calibration():
     if not os.path.exists(TELEOP_CALIBRATION_PATH):
         return default_midpoint_teleop_calibration()
@@ -784,20 +817,14 @@ def load_config():
 
 
 def ros_positions_to_lerobot_action(positions, mapping):
-    scales = mapping.get("position_scales", {})
-    offsets = mapping.get("position_offsets_deg", {})
-    gripper_scale = float(mapping.get("gripper_scale", 100.0))
-    gripper_offset = float(mapping.get("gripper_offset", 0.0))
+    _ = mapping
     action = {}
     for index, name in enumerate(JOINT_NAMES):
         value = float(positions[index])
-        scale = float(scales.get(name, 1.0))
         if name == "gripper":
-            mapped = value * gripper_scale * scale + gripper_offset
-            action[name + ".pos"] = clamp(mapped, 0.0, 100.0)
+            action[name + ".pos"] = clamp(value, 0.0, 100.0)
         else:
-            mapped = math.degrees(value) * scale + float(offsets.get(name, 0.0))
-            action[name + ".pos"] = mapped
+            action[name + ".pos"] = clamp(value, -100.0, 100.0)
     return action
 
 
@@ -808,12 +835,17 @@ def lerobot_action_to_raw_goal(action, calibration):
         cal = calibration[name]
         min_value = int(cal["range_min"])
         max_value = int(cal["range_max"])
+        drive_mode = int(cal.get("drive_mode", 0))
         if name == "gripper":
+            if drive_mode:
+                value = 100.0 - value
             bounded = clamp(value, 0.0, 100.0)
             raw_value = int((bounded / 100.0) * (max_value - min_value) + min_value)
         else:
-            mid = (min_value + max_value) / 2.0
-            raw_value = int((value * STS_MAX_RESOLUTION / 360.0) + mid)
+            if drive_mode:
+                value = -value
+            bounded = clamp(value, -100.0, 100.0)
+            raw_value = int(((bounded + 100.0) / 200.0) * (max_value - min_value) + min_value)
         raw[name] = int(clamp(raw_value, min_value, max_value))
     return raw
 
@@ -859,10 +891,9 @@ def smooth_manual_position_points(points, passes=1, smooth_gripper=True):
 
 
 def raw_present_to_manual_positions(observation, calibration, mapping):
+    _ = mapping
     present = observation.get("present_positions") or {}
     positions = []
-    scales = mapping.get("position_scales", {})
-    offsets = mapping.get("position_offsets_deg", {})
     for name in JOINT_NAMES:
         cal = calibration[name]
         raw = present.get(str(cal["id"]))
@@ -871,16 +902,22 @@ def raw_present_to_manual_positions(observation, calibration, mapping):
         if raw is None:
             return None
         raw = float(raw)
-        scale = float(scales.get(name, 1.0)) or 1.0
+        range_min = float(cal["range_min"])
+        range_max = float(cal["range_max"])
+        if range_max == range_min:
+            return None
+        raw = clamp(raw, range_min, range_max)
+        drive_mode = int(cal.get("drive_mode", 0))
         if name == "gripper":
-            pct = (raw - float(cal["range_min"])) / (float(cal["range_max"]) - float(cal["range_min"])) * 100.0
-            gripper_scale = float(mapping.get("gripper_scale", 100.0)) or 100.0
-            gripper_offset = float(mapping.get("gripper_offset", 0.0))
-            positions.append(clamp((pct - gripper_offset) / (gripper_scale * scale), 0.0, 1.0))
+            value = (raw - range_min) / (range_max - range_min) * 100.0
+            if drive_mode:
+                value = 100.0 - value
+            positions.append(clamp(value, 0.0, 100.0))
         else:
-            action_deg = (raw - (float(cal["range_min"]) + float(cal["range_max"])) / 2.0) * 360.0 / STS_MAX_RESOLUTION
-            control_deg = (action_deg - float(offsets.get(name, 0.0))) / scale
-            positions.append(math.radians(control_deg))
+            value = ((raw - range_min) / (range_max - range_min) * 200.0) - 100.0
+            if drive_mode:
+                value = -value
+            positions.append(clamp(value, -100.0, 100.0))
     return positions
 
 
@@ -1294,6 +1331,15 @@ class RawTeleopSession(object):
         self.last_gripper_debug = {}
         self.last_joint_debug = {}
         self.last_step_ms = 0
+        self.last_loop_ms = 0.0
+        self.last_cycle_ms = 0.0
+        self.last_leader_read_ms = 0.0
+        self.last_write_ms = 0.0
+        self.last_follower_read_ms = 0.0
+        self.actual_frequency_hz = 0.0
+        self.requested_frequency_hz = 0.0
+        self.feedback_frequency_hz = 0.0
+        self.active_step_raw_by_joint = []
         self.frames = 0
         self.recorded_points = []
         self.recording_interval = 0.25
@@ -1336,6 +1382,17 @@ class RawTeleopSession(object):
                 "last_gripper_debug": dict(self.last_gripper_debug),
                 "last_joint_debug": dict(self.last_joint_debug),
                 "last_step_ms": self.last_step_ms,
+                "timing": {
+                    "requested_frequency_hz": self.requested_frequency_hz,
+                    "actual_frequency_hz": self.actual_frequency_hz,
+                    "feedback_frequency_hz": self.feedback_frequency_hz,
+                    "last_cycle_ms": self.last_cycle_ms,
+                    "last_loop_ms": self.last_loop_ms,
+                    "leader_read_ms": self.last_leader_read_ms,
+                    "write_ms": self.last_write_ms,
+                    "follower_read_ms": self.last_follower_read_ms,
+                },
+                "active_step_raw_by_joint": list(self.active_step_raw_by_joint),
                 "calibration": dict(self.teleop_calibration),
             }
 
@@ -1431,6 +1488,15 @@ class RawTeleopSession(object):
             self.pause_event.clear()
             self.last_error = ""
             self.frames = 0
+            self.last_loop_ms = 0.0
+            self.last_cycle_ms = 0.0
+            self.last_leader_read_ms = 0.0
+            self.last_write_ms = 0.0
+            self.last_follower_read_ms = 0.0
+            self.actual_frequency_hz = 0.0
+            self.requested_frequency_hz = 0.0
+            self.feedback_frequency_hz = 0.0
+            self.active_step_raw_by_joint = []
             self.recorded_points = []
             self.recording_interval = clamp(float(options.get("recording_delay", 0.25)), 0.05, 3.0)
             self._last_record_sample_ts = 0.0
@@ -1471,8 +1537,20 @@ class RawTeleopSession(object):
         if len(leader_ids) != len(follower_ids):
             self._finish_with_error("主臂 ID 数量必须等于从臂 6 个关节")
             return
-        frequency = clamp(float(options.get("frequency_hz", self.serial_config.get("teleop_frequency_hz", 12.0))), 5.0, 50.0)
+        frequency = clamp(float(options.get("frequency_hz", self.serial_config.get("teleop_frequency_hz", 30.0))), 5.0, 50.0)
         interval = 1.0 / frequency
+        feedback_frequency = clamp(
+            float(options.get("feedback_frequency_hz", self.serial_config.get("teleop_feedback_frequency_hz", 5.0))),
+            1.0,
+            frequency,
+        )
+        feedback_every = max(1, int(round(frequency / feedback_frequency)))
+        gripper_rewrite_frequency = clamp(
+            float(options.get("gripper_rewrite_frequency_hz", self.serial_config.get("teleop_gripper_rewrite_frequency_hz", 5.0))),
+            1.0,
+            frequency,
+        )
+        gripper_rewrite_every = max(1, int(round(frequency / gripper_rewrite_frequency)))
         gains = parse_float_list(options.get("gains", self.serial_config.get("teleop_gains")), self._joint_count(), 1.0)
         invert = parse_float_list(options.get("invert", self.serial_config.get("teleop_invert")), self._joint_count(), 1.0)
         deadband_raw = parse_float_list(
@@ -1482,10 +1560,10 @@ class RawTeleopSession(object):
         )
         smoothing_alpha_raw = options.get(
             "smoothing_alpha_by_joint",
-            options.get("smoothing_alpha", self.serial_config.get("teleop_smoothing_alpha_by_joint", self.serial_config.get("teleop_smoothing_alpha", 0.35))),
+            options.get("smoothing_alpha", self.serial_config.get("teleop_smoothing_alpha_by_joint", self.serial_config.get("teleop_smoothing_alpha", 0.75))),
         )
         if isinstance(smoothing_alpha_raw, (list, tuple)):
-            smoothing_alpha = [clamp(v, 0.05, 1.0) for v in parse_float_list(smoothing_alpha_raw, self._joint_count(), 0.35)]
+            smoothing_alpha = [clamp(v, 0.05, 1.0) for v in parse_float_list(smoothing_alpha_raw, self._joint_count(), 0.75)]
         else:
             smoothing_alpha = [clamp(float(smoothing_alpha_raw), 0.05, 1.0)] * self._joint_count()
         max_delta = parse_float_list(
@@ -1493,12 +1571,11 @@ class RawTeleopSession(object):
             self._joint_count(),
             480.0,
         )
-        max_step_raw = clamp(float(options.get("max_step_raw", self.serial_config.get("teleop_max_step_raw", 12.0))), 2.0, 200.0)
-        step_raw_by_joint = options.get("step_raw_by_joint", self.serial_config.get("teleop_step_raw_by_joint"))
-        if step_raw_by_joint is not None:
-            per_joint_step = [clamp(v, 2.0, 200.0) for v in parse_float_list(step_raw_by_joint, self._joint_count(), max_step_raw)]
-        else:
-            per_joint_step = [max_step_raw] * self._joint_count()
+        _, per_joint_step = resolve_teleop_step_limits(options, self.serial_config, self._joint_count())
+        with self.lock:
+            self.requested_frequency_hz = frequency
+            self.feedback_frequency_hz = frequency / float(feedback_every)
+            self.active_step_raw_by_joint = list(per_joint_step)
         leader_cfg = self._leader_config()
         if options.get("leader_port"):
             leader_cfg["port"] = options.get("leader_port")
@@ -1546,7 +1623,10 @@ class RawTeleopSession(object):
                 time.sleep(0.02)
             self.follower_driver.torque_enabled = True
             current_goal = dict(follower_now_at_start)
+            follower_now = dict(follower_now_at_start)
             filtered_leader = dict((int(k), float(v)) for k, v in leader_now_at_start.items())
+            cycle_index = 0
+            previous_loop_start = None
             with self.lock:
                 self.last_leader_raw = dict(leader_now_at_start)
                 self.last_follower_raw = dict(follower_now_at_start)
@@ -1558,10 +1638,15 @@ class RawTeleopSession(object):
                 }
             while not self.stop_event.is_set():
                 if self.pause_event.is_set():
+                    previous_loop_start = None
                     self.stop_event.wait(0.05)
                     continue
                 loop_start = time.time()
+                cycle_ms = (loop_start - previous_loop_start) * 1000.0 if previous_loop_start is not None else 0.0
+                previous_loop_start = loop_start
+                leader_read_start = time.time()
                 leader_now = self.leader_bus.read_present_positions(leader_ids)
+                leader_read_ms = (time.time() - leader_read_start) * 1000.0
                 goal = {}
                 filtered_leader_raw = {}
                 joint_debug = {}
@@ -1612,9 +1697,13 @@ class RawTeleopSession(object):
                             "goal_raw": int(goal[follower_id]),
                             "hold_active": bool(time.time() < gripper_hold_until),
                         }
+                write_start = time.time()
                 self.follower_driver.bus.sync_write_word(STS_ADDR_GOAL_POSITION, goal)
                 gripper_follower_id = int(follower_ids[gripper_index])
-                self.follower_driver.bus.write_word(gripper_follower_id, STS_ADDR_GOAL_POSITION, goal[gripper_follower_id])
+                gripper_rewrite_offset = gripper_rewrite_every // 2
+                if cycle_index % gripper_rewrite_every == gripper_rewrite_offset:
+                    self.follower_driver.bus.write_word(gripper_follower_id, STS_ADDR_GOAL_POSITION, goal[gripper_follower_id])
+                write_ms = (time.time() - write_start) * 1000.0
                 current_goal = dict(goal)
                 now = time.time()
                 if now - self._last_record_sample_ts >= self.recording_interval:
@@ -1623,21 +1712,39 @@ class RawTeleopSession(object):
                         with self.lock:
                             self.recorded_points.append(point)
                         self._last_record_sample_ts = now
-                try:
-                    follower_now = self.follower_driver.bus.read_present_positions(follower_ids)
-                except Exception:
-                    follower_now = {}
+                follower_sampled = cycle_index % feedback_every == 0
+                follower_read_ms = 0.0
+                if follower_sampled:
+                    follower_read_start = time.time()
+                    try:
+                        follower_now = self.follower_driver.bus.read_present_positions(follower_ids)
+                    except Exception:
+                        pass
+                    follower_read_ms = (time.time() - follower_read_start) * 1000.0
                 gripper_present = follower_now.get(int(follower_ids[gripper_index])) if isinstance(follower_now, dict) else None
                 gripper_debug["follower_present_raw"] = int(gripper_present) if gripper_present is not None else None
+                loop_ms = (time.time() - loop_start) * 1000.0
                 with self.lock:
                     self.frames += 1
                     self.last_step_ms = now_ms()
+                    self.last_loop_ms = round(loop_ms, 2)
+                    self.last_cycle_ms = round(cycle_ms, 2)
+                    self.last_leader_read_ms = round(leader_read_ms, 2)
+                    self.last_write_ms = round(write_ms, 2)
+                    if follower_sampled:
+                        self.last_follower_read_ms = round(follower_read_ms, 2)
+                    if cycle_ms > 0:
+                        cycle_frequency = 1000.0 / cycle_ms
+                        if self.actual_frequency_hz > 0:
+                            cycle_frequency = self.actual_frequency_hz * 0.8 + cycle_frequency * 0.2
+                        self.actual_frequency_hz = round(cycle_frequency, 2)
                     self.last_leader_raw = dict((int(k), int(v)) for k, v in filtered_leader_raw.items())
                     self.last_follower_raw = dict((int(k), int(v)) for k, v in follower_now.items())
                     self.last_goal_raw = dict((int(k), int(v)) for k, v in goal.items())
                     self.last_gripper_debug = dict(gripper_debug)
                     self.last_joint_debug = dict(joint_debug)
                     self.last_error = ""
+                cycle_index += 1
                 elapsed = time.time() - loop_start
                 wait = max(0.0, interval - elapsed)
                 if self.stop_event.wait(wait):
@@ -1666,7 +1773,7 @@ class DryRunFollowerDriver(FollowerDriver):
     def __init__(self, mapping):
         self.mapping = mapping
         self.connected = False
-        self.last_positions = [0.0, -0.2, 0.4, -0.2, 0.0, 0.2]
+        self.last_positions = [0.0, 0.0, 0.0, 0.0, 0.0, 50.0]
         self.last_action = ros_positions_to_lerobot_action(self.last_positions, mapping)
 
     def connect(self):
@@ -2034,6 +2141,8 @@ class DemoRuntime(object):
         }
         self.driver = self._make_driver()
         self.teleop = RawTeleopSession(self.serial_config, self.calibration)
+        self.rviz_sync_proc = None
+        self.gz_debug_proc = None
         self._cached_obs = {"monitor_mode": self.state["monitor_mode"], "connected": False}
         self._watcher_stop = threading.Event()
         if bool(self.serial_config.get("monitor_mode", False)):
@@ -2057,10 +2166,6 @@ class DemoRuntime(object):
                     self._cached_obs = {"monitor_mode": True, "connected": False}
                 continue
             if not os.access(port, os.R_OK | os.W_OK):
-                subprocess.call(
-                    ["sudo", "-n", "chmod", "666", port],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                )
                 if not os.access(port, os.R_OK | os.W_OK):
                     with self.lock:
                         self.state["connected"] = False
@@ -2139,7 +2244,65 @@ class DemoRuntime(object):
             result["log_path"] = self.log_path
             result["last_observation"] = dict(self._cached_obs)
             result["teleop"] = teleop_status
+            result["rviz_sync"] = self.rviz_sync_status()
+            result["gz_debug"] = self.gz_debug_status()
             return result
+
+    def rviz_sync_status(self):
+        proc = self.rviz_sync_proc
+        running = bool(proc is not None and proc.poll() is None)
+        return {
+            "running": running,
+            "pid": int(proc.pid) if running else None,
+            "launch": RVIZ_SYNC_LAUNCH,
+        }
+
+    def start_rviz_sync(self):
+        with self.lock:
+            if self.rviz_sync_proc is not None and self.rviz_sync_proc.poll() is None:
+                return {"ok": True, "message": "RViz 同步已在运行", "rviz_sync": self.rviz_sync_status()}
+            if not os.path.isfile(RVIZ_SYNC_LAUNCH):
+                return {"ok": False, "error": "RViz sync launch not found: %s" % RVIZ_SYNC_LAUNCH}
+            if not all(os.path.isfile(p) for p in (ROS2_BASE_SETUP, ROS2_WS_SETUP)):
+                return {"ok": False, "error": "ROS environment unavailable; configure SO101_ROS2_SETUP and SO101_ROS2_WS_SETUP after validating the target distro"}
+            cmd = "source %s && source %s && exec ros2 launch %s use_rviz:=true" % tuple(
+                shlex.quote(p) for p in (ROS2_BASE_SETUP, ROS2_WS_SETUP, RVIZ_SYNC_LAUNCH))
+            self.rviz_sync_proc = subprocess.Popen(
+                ["bash", "-lc", cmd],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self._log("rviz_sync_started", {"pid": self.rviz_sync_proc.pid, "launch": RVIZ_SYNC_LAUNCH})
+            return {"ok": True, "message": "已打开 RViz 并启动真机同步", "rviz_sync": self.rviz_sync_status()}
+
+    def gz_debug_status(self):
+        proc = self.gz_debug_proc
+        running = bool(proc is not None and proc.poll() is None)
+        return {
+            "running": running,
+            "pid": int(proc.pid) if running else None,
+            "launch": GZ_DEBUG_LAUNCH,
+        }
+
+    def start_gz_debug(self):
+        with self.lock:
+            if self.gz_debug_proc is not None and self.gz_debug_proc.poll() is None:
+                return {"ok": True, "message": "GZ 调试已在运行", "gz_debug": self.gz_debug_status()}
+            if not os.path.isfile(GZ_DEBUG_LAUNCH):
+                return {"ok": False, "error": "GZ debug launch not found: %s" % GZ_DEBUG_LAUNCH}
+            if not all(os.path.isfile(p) for p in (ROS2_BASE_SETUP, ROS2_WS_SETUP, "/usr/share/gazebo/setup.bash")):
+                return {"ok": False, "error": "ROS/Gazebo Classic environment unavailable; this historical bridge is not certified for Jazzy"}
+            cmd = "source /usr/share/gazebo/setup.bash && source %s && source %s && exec ros2 launch %s use_gzclient:=true" % tuple(
+                shlex.quote(p) for p in (ROS2_BASE_SETUP, ROS2_WS_SETUP, GZ_DEBUG_LAUNCH))
+            self.gz_debug_proc = subprocess.Popen(
+                ["bash", "-lc", cmd],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self._log("gz_debug_started", {"pid": self.gz_debug_proc.pid, "launch": GZ_DEBUG_LAUNCH})
+            return {"ok": True, "message": "已启动 GZ 调试场景", "gz_debug": self.gz_debug_status()}
 
     def _requires_control_initialization(self):
         return not bool(self.state.get("dry_run")) and not bool(self.state.get("monitor_mode"))
@@ -2173,10 +2336,6 @@ class DemoRuntime(object):
             raise RuntimeError("serial port %s does not exist" % port)
         if os.access(port, os.R_OK | os.W_OK):
             return
-        subprocess.call(
-            ["sudo", "-n", "chmod", "666", port],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
         if not os.access(port, os.R_OK | os.W_OK):
             raise RuntimeError("serial port %s permission denied" % port)
 
@@ -2222,10 +2381,7 @@ class DemoRuntime(object):
             return None
         for path in candidates:
             if not os.access(path, os.R_OK | os.W_OK):
-                subprocess.call(
-                    ["sudo", "-n", "chmod", "666", path],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                )
+                continue
             if not ids:
                 if os.access(path, os.R_OK | os.W_OK):
                     self._apply_resolved_port(path, "port")
@@ -3016,12 +3172,14 @@ class DemoRuntime(object):
             os.makedirs(RECORDINGS_DIR)
         filename = self._recording_file_name(template_name)
         write_json(os.path.join(RECORDINGS_DIR, filename), {
-            "schema": "so101_recording.v1",
+            "schema": "so101_recording.v2",
             "template": template_name,
             "name": requested_name or template_name,
             "created_ms": now_ms(),
             "delay": delay,
             "joint_names": JOINT_NAMES,
+            "units": dict((name, "lerobot_range_0_100" if name == "gripper" else "lerobot_range_m100_100") for name in JOINT_NAMES),
+            "unit_standard": "official_lerobot_so101_normalized_v777",
             "points": normalized_points,
         })
         with self.lock:
@@ -3723,13 +3881,10 @@ class DemoRuntime(object):
         # Decide whether to interpolate. Skip if all 6 axes are already close to target.
         close_enough = True
         for index, name in enumerate(JOINT_NAMES):
-            rmin = float(self.calibration[name]["range_min"])
-            rmax = float(self.calibration[name]["range_max"])
-            span = max(1e-6, rmax - rmin)
             if name == "gripper":
-                span_norm = 1.0
+                span_norm = 100.0
             else:
-                span_norm = span * (2.0 * math.pi) / STS_MAX_RESOLUTION
+                span_norm = 200.0
             if abs(current[index] - target[index]) / span_norm > min_step_ratio:
                 close_enough = False
                 break
@@ -3879,7 +4034,8 @@ class DemoRuntime(object):
                 self.pause_event.clear()
 
 
-RUNTIME = DemoRuntime()
+# Importing utility functions/tests must not read private configuration or start watchers.
+RUNTIME = None
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -3889,6 +4045,10 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "SO101MintDemo/0.1"
+
+    def setup(self):
+        BaseHTTPRequestHandler.setup(self)
+        self.connection.settimeout(10)
 
     def _send_json(self, payload, status=200):
         raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -3911,10 +4071,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _read_body(self):
         length = int(self.headers.get("Content-Length", "0") or "0")
+        if self.headers.get("Transfer-Encoding") or length < 0 or length > MAX_BODY_BYTES:
+            raise ValueError("request body must be bounded Content-Length JSON")
         if length <= 0:
             return {}
         raw = self.rfile.read(length).decode("utf-8")
-        return json.loads(raw or "{}")
+        body = json.loads(raw or "{}")
+        if not isinstance(body, dict):
+            raise ValueError("JSON object required")
+        return body
 
     def _session(self):
         return login_session_from_token(self.headers.get("X-Session-Token", ""))
@@ -3937,6 +4102,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = unquote(self.path.split("?", 1)[0])
+        if path.startswith('/api/') and not self._require_login():
+            return
         try:
             if path == "/api/status":
                 self._send_json(RUNTIME.status())
@@ -3975,18 +4142,30 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send_json({"ok": False, "error": "not found"}, status=404)
         except Exception as exc:
-            self._send_json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, status=500)
+            self.log_error("request failed: %s", exc)
+            self._send_json({"ok": False, "error": "请求失败，请查看服务端日志"}, status=500)
 
     def do_POST(self):
         path = unquote(self.path.split("?", 1)[0])
+        if path != '/api/login' and not self._require_login():
+            return
         try:
-            body = self._read_body()
+            try:
+                body = self._read_body()
+            except (ValueError, UnicodeError):
+                self.close_connection = True
+                self._send_json({"ok": False, "error": "无效请求体（JSON 对象，最大 1 MiB）"}, status=400)
+                return
             if path == "/api/connect":
                 self._send_json(RUNTIME.connect())
             elif path == "/api/disconnect":
                 self._send_json(RUNTIME.disconnect())
             elif path == "/api/stop":
                 self._send_json(RUNTIME.stop())
+            elif path == "/api/rviz-sync/start":
+                self._send_json(RUNTIME.start_rviz_sync())
+            elif path == "/api/gz-debug/start":
+                self._send_json(RUNTIME.start_gz_debug())
             elif path == "/api/pause":
                 self._send_json(RUNTIME.pause())
             elif path == "/api/resume":
@@ -4110,13 +4289,16 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send_json({"ok": False, "error": "not found"}, status=404)
         except Exception as exc:
-            self._send_json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, status=500)
+            self.log_error("request failed: %s", exc)
+            self._send_json({"ok": False, "error": "请求失败，请查看服务端日志"}, status=500)
 
     def log_message(self, fmt, *args):
         sys.stdout.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
 
 def main():
+    global RUNTIME
+    RUNTIME = DemoRuntime()
     host = RUNTIME.serial_config.get("http_host", "127.0.0.1")
     port = int(RUNTIME.serial_config.get("http_port", 8765))
     url = "http://%s:%d" % (host, port)

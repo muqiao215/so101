@@ -1,0 +1,21 @@
+joint_order:
+  - shoulder_pan
+  - shoulder_lift
+  - elbow_flex
+  - wrist_flex
+  - wrist_roll
+  - gripper
+mapping:
+  shoulder_pan: {source: shoulder_pan, sign: -1.0, offset: 0.0}
+  shoulder_lift: {source: shoulder_lift, sign: 1.0, offset: 0.0}
+  elbow_flex: {source: elbow_flex, sign: -1.0, offset: 0.0}
+  wrist_flex: {source: wrist_flex, sign: -1.0, offset: 0.0}
+  wrist_roll: {source: wrist_roll, sign: -1.0, offset: 0.0}
+  gripper: {source: gripper, sign: -1.0, offset: 1.0}
+limits:
+  shoulder_pan: [-1.91986, 1.91986]
+  shoulder_lift: [-1.74533, 1.90]
+  elbow_flex: [-1.80, 1.80]
+  wrist_flex: [-1.95, 1.95]
+  wrist_roll: [-2.74385, 2.84121]
+  gripper: [-0.174533, 1.74533]

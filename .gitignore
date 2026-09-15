@@ -7,3 +7,17 @@ __pycache__/
 release_packages/
 win7_follower_demo/config/recordings/.trash/
 mint_follower_demo/config/recordings/.trash/
+mint_follower_demo/config/recordings/
+mint_follower_demo/config/*calibration*.json*
+mint_follower_demo/config/login_records.json
+mint_follower_demo/config/business_run_log.json
+mint_follower_demo/config/serial_config.json
+mint_follower_demo/config/serial_config.linux_mint_example.json
+node_modules/
+build/
+install/
+log/
+target/
+dist/
+.omx/
+.vscode/

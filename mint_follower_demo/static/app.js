@@ -26,6 +26,8 @@
   var loginRecordsToggleBtn = document.getElementById('loginRecordsToggleBtn');
   var loginRecordsBody = document.getElementById('loginRecordsBody');
   var connectBtn = document.getElementById('connectBtn');
+  var rvizSyncBtn = document.getElementById('rvizSyncBtn');
+  var gzDebugBtn = document.getElementById('gzDebugBtn');
   var jointGrid = document.getElementById('jointGrid');
   var jointTimestamp = document.getElementById('jointTimestamp');
   var workflowBar = document.getElementById('workflowBar');
@@ -62,9 +64,6 @@
   var teleopMeta = document.getElementById('teleopMeta');
   var teleopScanBtn = document.getElementById('teleopScanBtn');
   var teleopCalibrateBtn = document.getElementById('teleopCalibrateBtn');
-  var gripperCalArmSelect = document.getElementById('gripperCalArmSelect');
-  var followerGripperMinBtn = document.getElementById('followerGripperMinBtn');
-  var followerGripperCloseTestBtn = document.getElementById('followerGripperCloseTestBtn');
   var teleopHealthBtn = document.getElementById('teleopHealthBtn');
   var teleopStartBtn = document.getElementById('teleopStartBtn');
   var teleopPauseBtn = document.getElementById('teleopPauseBtn');
@@ -94,11 +93,11 @@
   var JOINT_NAMES = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
   var JOINT_LABELS = ['\u5E95\u5EA7', '\u80A9\u90E8', '\u8098\u90E8', '\u8155\u4FEF\u4EF0', '\u8155\u65CB\u8F6C', '\u5939\u722A'];
   var AXIS_UI = [
-    { min: -120, max: 120, step: 1, unit: '\u00B0' },
-    { min: -120, max: 120, step: 1, unit: '\u00B0' },
-    { min: -120, max: 120, step: 1, unit: '\u00B0' },
-    { min: -120, max: 120, step: 1, unit: '\u00B0' },
-    { min: -180, max: 180, step: 1, unit: '\u00B0' },
+    { min: -100, max: 100, step: 1, unit: '' },
+    { min: -100, max: 100, step: 1, unit: '' },
+    { min: -100, max: 100, step: 1, unit: '' },
+    { min: -100, max: 100, step: 1, unit: '' },
+    { min: -100, max: 100, step: 1, unit: '' },
     { min: 0, max: 100, step: 2, unit: '%' }
   ];
   var CAL = null;
@@ -114,8 +113,6 @@
   var pendingRecordingSelection = '';
   var pendingSavePayload = null;
   var teleopAlignmentArmed = false;
-  var followerGripperMinArmed = false;
-  var gripperMinCalibrationArm = 'follower';
   var loginRole = 'admin';
   var loginSession = null;
   var loginRecords = [];
@@ -184,6 +181,10 @@
       body: body ? JSON.stringify(body) : undefined,
       signal: controller ? controller.signal : undefined
     }).then(function (res) {
+      if (res.status === 401) {
+        loginSession = null;
+        if (loginGate) loginGate.classList.remove('hidden');
+      }
       return res.json();
     }).catch(function (err) {
       if (didAbort) {
@@ -240,7 +241,7 @@
       loginNameInput.autocomplete = loginRole === 'admin' ? 'username' : 'name';
     }
     if (loginPasswordField) {
-      loginPasswordField.className = 'login-field' + (loginRole === 'admin' ? '' : ' hidden');
+      loginPasswordField.className = 'login-field';
     }
     if (loginPasswordInput) {
       loginPasswordInput.value = '';
@@ -359,31 +360,29 @@
     return isNaN(value) ? null : value;
   }
 
-  function rawToPosition(raw, name) {
+  function rawToOfficialPosition(raw, name) {
     if (!CAL || !CAL[name]) return 0;
     var c = CAL[name];
-    var scales = mapping.position_scales || {};
-    var offsets = mapping.position_offsets_deg || {};
-    var scale = Number(scales[name] === undefined ? 1 : scales[name]) || 1;
+    var bounded = clamp(Number(raw), Number(c.range_min), Number(c.range_max));
+    var driveMode = Number(c.drive_mode || 0);
     if (name === 'gripper') {
-      var pct = (raw - c.range_min) / (c.range_max - c.range_min) * 100;
-      var gripperScale = Number(mapping.gripper_scale === undefined ? 100 : mapping.gripper_scale) || 100;
-      var gripperOffset = Number(mapping.gripper_offset || 0);
-      return clamp((pct - gripperOffset) / (gripperScale * scale), 0, 1);
+      var pct = (bounded - c.range_min) / (c.range_max - c.range_min) * 100;
+      return driveMode ? 100 - pct : pct;
     }
-    var actionDeg = (raw - (c.range_min + c.range_max) / 2) * 360 / 4095;
-    var controlDeg = (actionDeg - Number(offsets[name] || 0)) / scale;
-    return controlDeg * Math.PI / 180;
+    var norm = ((bounded - c.range_min) / (c.range_max - c.range_min) * 200) - 100;
+    return driveMode ? -norm : norm;
+  }
+
+  function rawToPosition(raw, name) {
+    return rawToOfficialPosition(raw, name);
   }
 
   function displayFromPosition(index, value) {
-    if (JOINT_NAMES[index] === 'gripper') return value * 100;
-    return value * 180 / Math.PI;
+    return value;
   }
 
   function positionFromDisplay(index, value) {
-    if (JOINT_NAMES[index] === 'gripper') return value / 100;
-    return value * Math.PI / 180;
+    return value;
   }
 
   function needsLiveInitialization() {
@@ -599,7 +598,16 @@
     }
     setVisionResultText(parts.join(' / '));
     if (visionSnapshot && payload.annotated_image_url) {
-      visionSnapshot.src = payload.annotated_image_url;
+      if (loginSession && loginSession.token) {
+        var snapshotToken = loginSession.token;
+        fetch(payload.annotated_image_url, { headers: { 'X-Session-Token': snapshotToken } })
+          .then(function (response) { if (!response.ok) throw new Error('Image unavailable'); return response.blob(); })
+          .then(function (blob) {
+            if (!loginSession || loginSession.token !== snapshotToken) return;
+            if (visionSnapshot.src.indexOf('blob:') === 0) URL.revokeObjectURL(visionSnapshot.src);
+            visionSnapshot.src = URL.createObjectURL(blob);
+          }).catch(function () { /* Keep the last image on transient failures. */ });
+      }
       visionSnapshot.className = 'vision-snapshot';
     }
   }
@@ -1277,10 +1285,14 @@
     if (teleopMeta) {
       if (running) {
         var gripperDebug = teleop.last_gripper_debug || {};
+        var timing = teleop.timing || {};
+        var timingText = timing.actual_frequency_hz
+          ? (' / ' + timing.actual_frequency_hz + ' Hz / loop ' + timing.last_loop_ms + ' ms')
+          : '';
         var gripperText = gripperDebug.goal_raw !== undefined
           ? (' / G 主 ' + gripperDebug.leader_now_raw + ' 从始 ' + gripperDebug.follower_start_raw + ' 实 ' + gripperDebug.follower_present_raw + ' 目 ' + gripperDebug.goal_raw + (gripperDebug.hold_active ? ' 保持' : ''))
           : '';
-        teleopMeta.textContent = (paused ? '已暂停' : '跟随中') + ' / ' + (teleop.frames || 0) + ' frames' + gripperText;
+        teleopMeta.textContent = (paused ? '已暂停' : '跟随中') + ' / ' + (teleop.frames || 0) + ' frames' + timingText + gripperText;
       } else if (midpointCalibrated) {
         teleopMeta.textContent = '已校准 / 中位校准 / ' + new Date(Number(teleop.calibration.created_ms || 0)).toLocaleString();
       } else if (calibrated) {
@@ -1300,12 +1312,6 @@
       teleopCalibrateBtn.disabled = busy || !canUseTeleop;
       teleopCalibrateBtn.textContent = teleopAlignmentArmed ? '保存当前位置对齐' : '手动重设对齐';
     }
-    if (followerGripperMinBtn) {
-      followerGripperMinBtn.disabled = busy || !canUseTeleop;
-      followerGripperMinBtn.textContent = followerGripperMinArmed ? '保存夹爪闭合端' : '夹爪闭合端';
-    }
-    if (gripperCalArmSelect) gripperCalArmSelect.disabled = busy || followerGripperMinArmed;
-    if (followerGripperCloseTestBtn) followerGripperCloseTestBtn.disabled = busy || !canUseTeleop;
     if (teleopHealthBtn) teleopHealthBtn.disabled = busy;
     if (teleopStartBtn) teleopStartBtn.disabled = busy || !canUseTeleop || !calibrated;
     if (teleopPauseBtn) teleopPauseBtn.disabled = !running || paused;
@@ -1548,13 +1554,9 @@
     return {
       leader_port: (leaderPortInput && leaderPortInput.value) || '/dev/ttyACM1',
       leader_ids: ids.length ? ids : [1, 2, 3, 4, 5, 6],
-      frequency_hz: clamp(Number((teleopFreqInput && teleopFreqInput.value) || 12), 5, 50),
-      max_step_raw: clamp(Number((teleopStepInput && teleopStepInput.value) || 12), 2, 120)
+      frequency_hz: clamp(Number((teleopFreqInput && teleopFreqInput.value) || 30), 5, 50),
+      max_step_raw: clamp(Number((teleopStepInput && teleopStepInput.value) || 48), 2, 120)
     };
-  }
-
-  function selectedGripperCalibrationArm() {
-    return gripperCalArmSelect && gripperCalArmSelect.value === 'leader' ? 'leader' : 'follower';
   }
 
   function scanLeaderArm() {
@@ -1603,7 +1605,6 @@
       addEvent('error', '先切到动作模式并连接从臂。');
       return;
     }
-    followerGripperMinArmed = false;
     if (!teleopAlignmentArmed) {
       if (!window.confirm('准备手动重设主从对齐？\n系统会先释放从臂力矩，然后你手动把主臂和从臂摆成同一姿态。摆好后再点“保存当前位置对齐”。')) {
         return;
@@ -1634,88 +1635,6 @@
         showCalibrationHealth(res.calibration && res.calibration.health, '新保存的校准');
       } else {
         addEvent('error', '主从校准失败: ' + (res.error || 'unknown'));
-      }
-      refreshStatus();
-    });
-  }
-
-  function calibrateFollowerGripperMin() {
-    if (!lastStatus || lastStatus.monitor_mode || !lastStatus.connected) {
-      addEvent('error', '先切到动作模式并连接从臂。');
-      return;
-    }
-    teleopAlignmentArmed = false;
-    if (!followerGripperMinArmed) {
-      gripperMinCalibrationArm = selectedGripperCalibrationArm();
-      var armLabel = gripperMinCalibrationArm === 'leader' ? '主臂' : '从臂';
-      if (!window.confirm('准备校准' + armLabel + '夹爪闭合端？\n系统只释放' + armLabel + '夹爪力矩。释放后，请手动把' + armLabel + '夹爪推到完全闭合端，再点“保存夹爪闭合端”。')) {
-        return;
-      }
-      var preparePayload = teleopPayload();
-      preparePayload.arm = gripperMinCalibrationArm;
-      addEvent('warn', '正在释放' + armLabel + '夹爪力矩...');
-      api('POST', '/api/gripper/prepare-min', preparePayload, 10000).then(function (res) {
-        if (!res) return;
-        if (res.ok) {
-          followerGripperMinArmed = true;
-          addEvent('ok', armLabel + '夹爪力矩已释放。请手动推到闭合端，然后点击“保存夹爪闭合端”。');
-        } else {
-          addEvent('error', '释放夹爪失败: ' + (res.error || 'unknown'));
-        }
-        updateTeleopAvailability();
-        refreshStatus();
-      });
-      return;
-    }
-    var saveArmLabel = gripperMinCalibrationArm === 'leader' ? '主臂' : '从臂';
-    if (!window.confirm('确认把当前' + saveArmLabel + '夹爪位置保存为闭合端 range_min？\n保存前会自动备份对应校准文件。')) {
-      return;
-    }
-    var savePayload = teleopPayload();
-    savePayload.arm = gripperMinCalibrationArm;
-    addEvent('warn', '正在保存' + saveArmLabel + '夹爪闭合端...');
-    api('POST', '/api/gripper/save-min', savePayload, 10000).then(function (res) {
-      if (!res) return;
-      if (res.ok) {
-        followerGripperMinArmed = false;
-        addEvent('ok', saveArmLabel + '夹爪闭合端已保存: ' + res.old_range_min + ' -> ' + res.new_range_min);
-        loadTemplates();
-      } else {
-        addEvent('error', '保存夹爪闭合端失败: ' + (res.error || 'unknown'));
-      }
-      updateTeleopAvailability();
-      refreshStatus();
-    });
-  }
-
-  function testFollowerGripperClose() {
-    if (!lastStatus || lastStatus.monitor_mode || !lastStatus.connected) {
-      addEvent('error', '先切到动作模式并连接从臂。');
-      return;
-    }
-    if (!window.confirm('直接测试从臂夹爪闭合？\n系统会连续 3 秒向 ID 6 发送闭合端 raw，不经过动作模板。')) {
-      return;
-    }
-    addEvent('warn', '正在直接测试从臂夹爪闭合...');
-    api('POST', '/api/follower-gripper/close-test', { duration: 3.0 }, 10000).then(function (res) {
-      if (!res) return;
-      if (res.ok) {
-        var diff = Math.abs(Number(res.final_raw) - Number(res.target_raw));
-        var type = diff <= 80 ? 'ok' : 'error';
-        var sync = res.limit_sync || {};
-        var before = sync.before || {};
-        var after = sync.after || {};
-        var limitText = '';
-        if (before.min_angle_limit !== undefined || after.min_angle_limit !== undefined) {
-          limitText = ' / limit ' +
-            (before.min_angle_limit !== undefined ? before.min_angle_limit : '-') + '-' +
-            (before.max_angle_limit !== undefined ? before.max_angle_limit : '-') + ' -> ' +
-            (after.min_angle_limit !== undefined ? after.min_angle_limit : '-') + '-' +
-            (after.max_angle_limit !== undefined ? after.max_angle_limit : '-');
-        }
-        addEvent(type, '夹爪闭合测试: start=' + res.start_raw + ' target=' + res.target_raw + ' final=' + res.final_raw + ' error=' + res.error_raw + limitText);
-      } else {
-        addEvent('error', '夹爪闭合测试失败: ' + (res.error || 'unknown'));
       }
       refreshStatus();
     });
@@ -1926,6 +1845,16 @@
     if (executionBadge) {
       executionBadge.className = 'hardware-badge ' + ((executionState === 'running' || executionState === 'connecting') ? 'connected' : (executionState === 'stopped' ? 'warn' : 'unknown'));
       executionBadge.textContent = executionState === 'connecting' ? '\u8FDE\u63A5\u4E2D' : (executionState === 'running' ? 'EXECUTING' : (executionState === 'stopped' ? 'STOPPED' : 'IDLE'));
+    }
+    if (rvizSyncBtn) {
+      var rvizSync = status.rviz_sync || {};
+      rvizSyncBtn.textContent = rvizSync.running ? 'RViz 同步运行中' : '打开 RViz 同步';
+      rvizSyncBtn.disabled = !!rvizSync.running;
+    }
+    if (gzDebugBtn) {
+      var gzDebug = status.gz_debug || {};
+      gzDebugBtn.textContent = gzDebug.running ? 'GZ 调试运行中' : 'GZ 调试';
+      gzDebugBtn.disabled = !!gzDebug.running;
     }
 
     if (manualModeHint) {
@@ -2215,6 +2144,40 @@
     });
   };
 
+  if (rvizSyncBtn) {
+    rvizSyncBtn.onclick = function () {
+      rvizSyncBtn.disabled = true;
+      rvizSyncBtn.textContent = '正在打开 RViz...';
+      addEvent('info', '正在打开 RViz 并启动真机同步。');
+      api('POST', '/api/rviz-sync/start', {}, 10000).then(function (res) {
+        if (!res) return;
+        if (res.ok) {
+          addEvent('ok', res.message || 'RViz 同步已启动');
+        } else {
+          addEvent('error', 'RViz 同步启动失败: ' + (res.error || 'unknown'));
+        }
+        refreshStatus();
+      });
+    };
+  }
+
+  if (gzDebugBtn) {
+    gzDebugBtn.onclick = function () {
+      gzDebugBtn.disabled = true;
+      gzDebugBtn.textContent = '正在启动 GZ...';
+      addEvent('info', '正在启动 GZ 调试场景。');
+      api('POST', '/api/gz-debug/start', {}, 10000).then(function (res) {
+        if (!res) return;
+        if (res.ok) {
+          addEvent('ok', res.message || 'GZ 调试已启动');
+        } else {
+          addEvent('error', 'GZ 调试启动失败: ' + (res.error || 'unknown'));
+        }
+        refreshStatus();
+      });
+    };
+  }
+
   document.getElementById('refreshBtn').onclick = function () {
     refreshStatus();
   };
@@ -2330,8 +2293,6 @@
   }
   if (teleopScanBtn) teleopScanBtn.onclick = scanLeaderArm;
   if (teleopCalibrateBtn) teleopCalibrateBtn.onclick = calibrateTeleop;
-  if (followerGripperMinBtn) followerGripperMinBtn.onclick = calibrateFollowerGripperMin;
-  if (followerGripperCloseTestBtn) followerGripperCloseTestBtn.onclick = testFollowerGripperClose;
   if (teleopHealthBtn) teleopHealthBtn.onclick = checkSavedCalibration;
   if (teleopStartBtn) teleopStartBtn.onclick = startTeleop;
   if (teleopPauseBtn) teleopPauseBtn.onclick = pauseTeleop;
@@ -2358,6 +2319,7 @@
     refreshStatus();
   });
   setLoginRole('admin');
+  if (loginGate) loginGate.className = 'login-gate';
   updateOperatorUi();
   setInterval(refreshStatus, 3000);
 }());

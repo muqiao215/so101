@@ -346,10 +346,12 @@ Example:
 Manual six-axis target:
 
 ```json
-{"label": "manual_six_axis", "positions": [0.0, -0.2, 0.4, -0.2, 0.0, 0.2]}
+{"label": "manual_six_axis", "positions": [0.0, -50.0, 20.0, -40.0, 0.0, 50.0]}
 ```
 
-The first five values are radians. The gripper value is normalized from `0.0` to `1.0`.
+All persisted and API `positions` use the official LeRobot SO101 unit standard:
+the first five joints are `-100..100`, and the gripper is `0..100`.
+URDF radians are used only at ROS/RViz/Gazebo export boundaries.
 In live mode, initialize control from the current hardware observation before sending manual targets or templates.
 `/api/stop` requests execution to stop and releases torque; it is not a physical emergency-stop button.
 After stopping, wait until the status returns to idle before starting the next action.

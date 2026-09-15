@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/style.css?v=23">
 </head>
 <body>
-  <section id="loginGate" class="login-gate">
+  <section id="loginGate" class="login-gate hidden">
     <div class="login-card">
       <p class="eyebrow">SO101 Console Access</p>
       <h1>选择登录身份</h1>
@@ -16,7 +16,7 @@
         <button type="button" id="loginEmployeeTab" class="secondary">员工</button>
       </div>
       <label class="login-field"><span id="loginNameLabel">管理员账号</span><input id="loginNameInput" type="text" maxlength="80" autocomplete="username" placeholder="admin"></label>
-      <label id="loginPasswordField" class="login-field"><span>密码</span><input id="loginPasswordInput" type="password" maxlength="80" autocomplete="current-password" placeholder="1234"></label>
+      <label id="loginPasswordField" class="login-field"><span>密码</span><input id="loginPasswordInput" type="password" maxlength="256" autocomplete="current-password" placeholder="输入部署时设置的密码"></label>
       <div class="login-actions">
         <button type="button" id="loginEnterBtn">进入控制台</button>
       </div>
@@ -40,6 +40,8 @@
       <div id="workflowBar" class="workflow-bar"></div>
       <div class="actions">
         <button id="connectBtn">连接硬件</button>
+        <button id="rvizSyncBtn" class="secondary">打开 RViz 同步</button>
+        <button id="gzDebugBtn" class="secondary">GZ 调试</button>
         <button id="monitorModeBtn" class="secondary">监视模式</button>
         <button id="actionModeBtn" class="secondary">动作模式</button>
         <button id="refreshBtn" class="secondary">刷新状态</button>
@@ -157,19 +159,13 @@
       <div class="teleop-grid">
         <label>主臂串口 <input id="leaderPortInput" type="text" value="/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B3D042873-if00"></label>
         <label>主臂 ID <input id="leaderIdsInput" type="text" value="1,2,3,4,5,6"></label>
-        <label>频率(Hz) <input id="teleopFreqInput" type="number" min="5" max="50" step="1" value="12"></label>
-        <label>单步限速(raw) <input id="teleopStepInput" type="number" min="2" max="120" step="1" value="12"></label>
+        <label>频率(Hz) <input id="teleopFreqInput" type="number" min="5" max="50" step="1" value="30"></label>
+        <label>单步限速(raw) <input id="teleopStepInput" type="number" min="2" max="120" step="1" value="48"></label>
         <div id="teleopMeta" class="record-count">未启动</div>
       </div>
       <div class="manual-actions">
         <button id="teleopScanBtn" class="secondary">扫描主臂</button>
         <button id="teleopCalibrateBtn" class="secondary">手动重设对齐</button>
-        <select id="gripperCalArmSelect" title="选择要校准的夹爪">
-          <option value="follower">从臂</option>
-          <option value="leader">主臂</option>
-        </select>
-        <button id="followerGripperMinBtn" class="secondary">夹爪闭合端</button>
-        <button id="followerGripperCloseTestBtn" class="secondary">从臂夹爪闭合测试</button>
         <button id="teleopHealthBtn" class="secondary">体检当前校准</button>
         <button id="teleopStartBtn">开始跟随</button>
         <button id="teleopPauseBtn" class="secondary">暂停跟随</button>
@@ -225,6 +221,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=44"></script>
+  <script src="/app.js?v=46"></script>
 </body>
 </html>

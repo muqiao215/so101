@@ -1,0 +1,26 @@
+source_units: lerobot_normalized_v777
+target_units: urdf_radians
+joint_order:
+  - shoulder_pan
+  - shoulder_lift
+  - elbow_flex
+  - wrist_flex
+  - wrist_roll
+  - gripper
+mapping:
+  # Body source units are official LeRobot RANGE_M100_100.
+  # scale converts one normalized unit to radians from the current follower calibration span.
+  shoulder_pan:  {source: shoulder_pan,  sign: -1.0, scale: 0.020997653462454857, offset: 0.0}
+  shoulder_lift: {source: shoulder_lift, sign: 1.0,  scale: 0.018765166375288484, offset: 1.5707963267948966}
+  elbow_flex:    {source: elbow_flex,    sign: -1.0, scale: 0.017514666735398043, offset: 0.0}
+  wrist_flex:    {source: wrist_flex,    sign: -1.0, scale: 0.01873447926756111,  offset: 0.0}
+  wrist_roll:    {source: wrist_roll,    sign: 1.0,  scale: 0.03141592653589793,  offset: 0.0}
+  # Gripper source is official 0..100. RViz jaw currently uses roughly 0..1 for visual checking.
+  gripper:       {source: gripper,       sign: -1.0, scale: 0.01,                 offset: 1.0}
+limits:
+  shoulder_pan:  [-1.91986, 1.91986]
+  shoulder_lift: [-1.74533, 1.90]
+  elbow_flex:    [-1.80, 1.80]
+  wrist_flex:    [-1.95, 1.95]
+  wrist_roll:    [-2.74385, 2.84121]
+  gripper:       [-0.174533, 1.74533]
